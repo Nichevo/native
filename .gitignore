@@ -1,0 +1,14 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+# On-device models are downloaded at build time (scripts/fetch-models.sh)
+app/src/main/assets/models/*.tflite
+# release keys stay out of git; the shared debug key below is intentional
+*.keystore
+!keystore/shared-debug.keystore
+*.jks
