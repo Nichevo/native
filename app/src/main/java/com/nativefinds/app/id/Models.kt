@@ -16,6 +16,7 @@ enum class IdSource(val label: String) {
     ON_DEVICE("On-phone model"),
     PC_AI("PC AI"),
     MANUAL("Entered by hand"),
+    SONG("BirdNET (bird song)"),
 }
 
 /** Whether the region pack says the species has been recorded in the chosen region. */

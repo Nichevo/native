@@ -32,6 +32,7 @@ import com.nativefinds.app.ui.finds.FindsScreen
 import com.nativefinds.app.ui.identify.IdentifyScreen
 import com.nativefinds.app.ui.library.LibraryScreen
 import com.nativefinds.app.ui.library.SpeciesScreen
+import com.nativefinds.app.ui.listen.ListenScreen
 import com.nativefinds.app.ui.map.MapScreen
 import com.nativefinds.app.ui.nearby.NearbyScreen
 import com.nativefinds.app.ui.stats.StatsScreen
@@ -92,6 +93,7 @@ fun AppNav(container: AppContainer) {
                     onNewFind = { nav.navigate("identify") },
                     onOpen = { id -> nav.navigate("find/$id") },
                     onStats = { nav.navigate("stats") },
+                    onListen = { nav.navigate("listen") },
                 )
             }
             composable("library") {
@@ -106,6 +108,13 @@ fun AppNav(container: AppContainer) {
                     container = container,
                     onBack = { nav.popBackStack() },
                     onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
+                )
+            }
+            composable("listen") {
+                ListenScreen(
+                    container = container,
+                    onBack = { nav.popBackStack() },
+                    onSaved = { id -> nav.navigate("find/$id") { popUpTo("finds") } },
                 )
             }
             composable("stats") {

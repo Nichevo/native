@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,13 +45,14 @@ import coil.compose.AsyncImage
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.Find
 import com.nativefinds.app.id.Category
+import com.nativefinds.app.ui.common.FindThumb
 import com.nativefinds.app.ui.common.establishmentLabel
 import com.nativefinds.app.ui.common.formatDate
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -> Unit, onStats: () -> Unit) {
+fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -> Unit, onStats: () -> Unit, onListen: () -> Unit) {
     val finds by container.db.finds().observeAll().collectAsState(initial = null)
     var query by rememberSaveable { mutableStateOf("") }
 
@@ -61,11 +64,14 @@ fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNewFind,
-                icon = { Icon(Icons.Filled.AddAPhoto, null) },
-                text = { Text("New find") },
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallFloatingActionButton(onClick = onListen) { Icon(Icons.Filled.Mic, "Identify a bird by its song") }
+                ExtendedFloatingActionButton(
+                    onClick = onNewFind,
+                    icon = { Icon(Icons.Filled.AddAPhoto, null) },
+                    text = { Text("New find") },
+                )
+            }
         },
     ) { padding ->
         val list = finds
@@ -107,12 +113,7 @@ fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -
 private fun FindRow(f: Find, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = File(f.photoPath),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
-            )
+            FindThumb(f.photoPath, Modifier.size(72.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(f.commonName ?: f.scientificName ?: "Unidentified", style = MaterialTheme.typography.titleMedium)

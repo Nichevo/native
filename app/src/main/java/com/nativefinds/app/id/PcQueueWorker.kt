@@ -1,5 +1,6 @@
 package com.nativefinds.app.id
 
+import com.nativefinds.app.audio.isAudioPath
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -25,8 +26,13 @@ class PcQueueWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val s = c.settings.current()
         if (!s.pcAiConfigured || s.offlineMode) return Result.success()
         for (f in c.db.finds().pendingPc()) {
-            val photos = c.db.finds().photos(f.id).map { Identifier.Photo(it.path, categoryOf(it.category)) }
-                .ifEmpty { listOf(Identifier.Photo(f.photoPath, categoryOf(f.category))) }
+            val photos = c.db.finds().photos(f.id).filterNot { isAudioPath(it.path) }
+                .map { Identifier.Photo(it.path, categoryOf(it.category)) }
+                .ifEmpty { listOfNotNull(Identifier.Photo(f.photoPath, categoryOf(f.category)).takeUnless { isAudioPath(f.photoPath) }) }
+            if (photos.isEmpty()) {
+                c.db.finds().update(f.copy(pendingPc = false, notes = appendNote(f.notes, "PC AI needs a photo; this find only has a sound recording.")))
+                continue
+            }
             val opinion = try {
                 c.identifier.secondOpinion(photos, s)
             } catch (e: PcUnreachableException) {

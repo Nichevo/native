@@ -27,7 +27,8 @@ class AppContainer(app: Application) {
     val regions = RegionPackRepository(db, inat)
     val species = SpeciesRepository(db, inat)
     val pests = com.nativefinds.app.info.PestList(app)
-    val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions, species)
+    val birdSong = com.nativefinds.app.audio.BirdSongClassifier(app)
+    val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions, species, birdSong)
 }
 
 class NativeFindsApp : Application() {

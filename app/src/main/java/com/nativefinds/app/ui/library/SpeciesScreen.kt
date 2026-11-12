@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.SpeciesInfo
+import com.nativefinds.app.ui.common.FindThumb
 import com.nativefinds.app.ui.common.PestBanner
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import com.nativefinds.app.ui.common.formatDate
@@ -85,12 +86,7 @@ fun SpeciesScreen(container: AppContainer, scientificName: String, onBack: () ->
                 mine.forEach { f ->
                     Card(onClick = { onOpenFind(f.id) }, modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = File(f.photoPath),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
-                            )
+                            FindThumb(f.photoPath, Modifier.size(64.dp))
                             Text("  " + formatDate(f.createdAt))
                         }
                     }

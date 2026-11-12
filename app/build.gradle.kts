@@ -97,4 +97,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+    // Plain interpreter for the BirdNET audio model (the task library only covers images)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
 }
