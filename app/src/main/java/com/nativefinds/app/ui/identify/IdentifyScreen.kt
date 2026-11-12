@@ -59,6 +59,7 @@ import coil.compose.AsyncImage
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.id.Category
 import com.nativefinds.app.ui.common.CandidateRow
+import com.nativefinds.app.ui.common.PestBanner
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import java.io.File
 
@@ -178,6 +179,7 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                         onClick = { vm.select(cand) },
                         selected = st.selected?.scientificName == cand.scientificName,
                         previousScore = st.previousScores[cand.scientificName.lowercase()],
+                        pest = container.pests.lookup(cand.scientificName, st.settings.regionPlaceId),
                     )
                 }
             }
@@ -202,6 +204,7 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
             }
 
             st.selected?.let { sel ->
+                container.pests.lookup(sel.scientificName, st.settings.regionPlaceId)?.let { PestBanner(it) }
                 Text("About this species", style = MaterialTheme.typography.titleSmall)
                 SpeciesInfoCard(st.selectedInfo, sel.commonName ?: sel.scientificName, st.settings.regionName, st.loadingInfo)
             }

@@ -49,6 +49,7 @@ import com.nativefinds.app.data.Regions
 import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.id.Category
 import com.nativefinds.app.id.PcQueueWorker
+import com.nativefinds.app.ui.common.PestBanner
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import com.nativefinds.app.ui.common.formatDate
 import kotlinx.coroutines.launch
@@ -147,6 +148,7 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
                 Text("No location saved", color = MaterialTheme.colorScheme.outline)
             }
 
+            container.pests.lookup(f.scientificName, placeId)?.let { PestBanner(it) }
             if (f.scientificName != null) {
                 SpeciesInfoCard(info, f.commonName ?: f.scientificName, regionName, loadingInfo)
             }

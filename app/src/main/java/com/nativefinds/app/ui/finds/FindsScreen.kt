@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -47,12 +49,17 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -> Unit) {
+fun FindsScreen(container: AppContainer, onNewFind: () -> Unit, onOpen: (Long) -> Unit, onStats: () -> Unit) {
     val finds by container.db.finds().observeAll().collectAsState(initial = null)
     var query by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("My finds") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("My finds") },
+                actions = { IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats and life list") } },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNewFind,

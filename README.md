@@ -21,6 +21,11 @@ they're native, and keeping a record of each find with its photo, GPS location a
 - **Offline mode**: on-phone models and cached data only, with no internet calls. Handy where Google
   and Wikipedia are blocked, or there's no signal.
 - **Finds**: list with search, a map (OpenStreetMap), notes, sharing, and CSV export.
+- **Seen near you**: birds and plants others have recorded on iNaturalist within 1 to 25 km, ticked when
+  you've found them, and a map layer of the last 30 days' sightings.
+- **Pest alerts** (New Zealand): pest birds and weeds are flagged, with links to report unwanted organisms
+  to MPI or check regional council advice. The list is in `app/src/main/assets/pests/nz.csv`.
+- **Stats**: life list with first-found dates, species per year (and new each year), and hotspots on the map.
 
 Everything is stored on the phone. Photos are only sent to Pl@ntNet or your own PC when you ask for an
 identification; your location is never sent to an identification service.
