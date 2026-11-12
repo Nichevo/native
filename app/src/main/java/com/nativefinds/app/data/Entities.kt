@@ -1,6 +1,8 @@
 package com.nativefinds.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -26,6 +28,23 @@ data class Find(
     val establishment: String?,
     val regionPlaceId: Int?,
     val notes: String = "",
+    /** Waiting for the PC AI to look at it (it was unreachable, or you asked for it later). */
+    @ColumnInfo(defaultValue = "0") val pendingPc: Boolean = false,
+)
+
+/** All photos of one find (the find's [Find.photoPath] is the cover photo). */
+@Entity(
+    tableName = "find_photos",
+    foreignKeys = [ForeignKey(entity = Find::class, parentColumns = ["id"], childColumns = ["findId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["findId"])],
+)
+data class FindPhoto(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val findId: Long,
+    val path: String,
+    /** [com.nativefinds.app.id.Category] name for this photo (leaf, flower, ...). */
+    val category: String,
+    val addedAt: Long,
 )
 
 /** Cached species information, so species pages work offline once seen. */

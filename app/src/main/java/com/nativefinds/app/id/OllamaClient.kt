@@ -18,12 +18,15 @@ import org.json.JSONObject
 class OllamaClient {
     data class Opinion(val candidates: List<Candidate>, val notes: String?)
 
-    suspend fun identify(photoPath: String, category: String, regionName: String, settings: AppSettings): Opinion =
+    suspend fun identify(photoPaths: List<String>, category: String, regionName: String, settings: AppSettings): Opinion =
         withContext(Dispatchers.IO) {
             if (!settings.pcAiConfigured) throw IdentificationException("Set up your PC AI in Settings")
-            val b64 = Base64.encodeToString(PhotoStore.jpegBytes(photoPath, maxSide = 1024), Base64.NO_WRAP)
+            val images = JSONArray()
+            photoPaths.take(4).forEach {
+                images.put(Base64.encodeToString(PhotoStore.jpegBytes(it, maxSide = 1024), Base64.NO_WRAP))
+            }
             val prompt = """
-                You are an expert naturalist. Identify the organism in this photo.
+                You are an expert naturalist. Identify the organism in these photos (all of the same individual).
                 The person says it is: $category. It was photographed in or near: $regionName.
                 Prefer species known to occur in $regionName unless the photo clearly shows otherwise.
                 Reply with JSON only, in exactly this shape:
@@ -39,14 +42,20 @@ class OllamaClient {
                 .put(
                     "messages",
                     JSONArray().put(
-                        JSONObject().put("role", "user").put("content", prompt).put("images", JSONArray().put(b64)),
+                        JSONObject().put("role", "user").put("content", prompt).put("images", images),
                     ),
                 )
             val req = request(settings, "/api/chat")
                 .post(payload.toString().toRequestBody("application/json".toMediaType()))
                 .build()
-            Http.slowClient.newCall(req).execute().use { resp ->
+            val call = try {
+                Http.slowClient.newCall(req).execute()
+            } catch (e: java.io.IOException) {
+                throw PcUnreachableException("Couldn't reach your PC (${e.message ?: "network error"})", e)
+            }
+            call.use { resp ->
                 val text = resp.body?.string().orEmpty()
+                if (resp.code in setOf(502, 503, 504, 521, 522, 523, 530)) throw PcUnreachableException(describeError(resp.code, text))
                 if (!resp.isSuccessful) throw IdentificationException(describeError(resp.code, text))
                 val content = JSONObject(text).optJSONObject("message")?.optString("content").orEmpty()
                 parse(content)

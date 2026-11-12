@@ -35,4 +35,7 @@ data class Candidate(
     val maoriName: String? = null,
 )
 
-class IdentificationException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class IdentificationException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** The PC couldn't be reached (off, asleep, no tunnel, no signal): worth queueing for later. */
+class PcUnreachableException(message: String, cause: Throwable? = null) : IdentificationException(message, cause)

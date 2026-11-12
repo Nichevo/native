@@ -63,6 +63,8 @@ fun CandidateRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    /** Score before the latest photo was added, to show how it moved. */
+    previousScore: Float? = null,
 ) {
     Card(
         onClick = onClick,
@@ -89,7 +91,15 @@ fun CandidateRow(
                         Text(c.scientificName, fontStyle = FontStyle.Italic, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-                Text("${(c.score * 100).toInt()}%", style = MaterialTheme.typography.titleMedium)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${(c.score * 100).toInt()}%", style = MaterialTheme.typography.titleMedium)
+                    val delta = previousScore?.let { ((c.score - it) * 100).toInt() }
+                    when {
+                        delta == null -> {}
+                        delta > 0 -> Text("▲ $delta", color = Color(0xFF2E7D32), style = MaterialTheme.typography.labelSmall)
+                        delta < 0 -> Text("▼ ${-delta}", color = Color(0xFFB26A00), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(c.source.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)

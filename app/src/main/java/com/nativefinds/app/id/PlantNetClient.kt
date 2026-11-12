@@ -14,20 +14,23 @@ import org.json.JSONObject
  * Pl@ntNet identification API (https://my.plantnet.org). Free accounts get 500 identifications a day.
  */
 class PlantNetClient {
-    suspend fun identify(photoPath: String, organ: String, apiKey: String, max: Int = 5): List<Candidate> =
+    /** Identifies from up to 5 photos of the same plant at once; more organs = more confident results. */
+    suspend fun identify(photos: List<Pair<String, String>>, apiKey: String, max: Int = 5): List<Candidate> =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) throw IdentificationException("Add your Pl@ntNet API key in Settings")
-            val jpeg = PhotoStore.jpegBytes(photoPath, maxSide = 1280)
             val url = "https://my-api.plantnet.org/v2/identify/all".toHttpUrl().newBuilder()
                 .addQueryParameter("api-key", apiKey)
                 .addQueryParameter("lang", "en")
                 .addQueryParameter("nb-results", max.toString())
                 .addQueryParameter("include-related-images", "false")
                 .build()
-            val body = MultipartBody.Builder().setType(MultipartBody.FORM)
-                .addFormDataPart("images", "photo.jpg", jpeg.toRequestBody("image/jpeg".toMediaType()))
-                .addFormDataPart("organs", organ)
-                .build()
+            val form = MultipartBody.Builder().setType(MultipartBody.FORM)
+            photos.take(5).forEachIndexed { i, (path, organ) ->
+                val jpeg = PhotoStore.jpegBytes(path, maxSide = 1280)
+                form.addFormDataPart("images", "photo$i.jpg", jpeg.toRequestBody("image/jpeg".toMediaType()))
+                form.addFormDataPart("organs", organ)
+            }
+            val body = form.build()
             val req = Request.Builder().url(url).post(body).build()
             Http.client.newCall(req).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
