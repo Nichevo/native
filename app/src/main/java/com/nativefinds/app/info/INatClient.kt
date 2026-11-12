@@ -84,8 +84,9 @@ class INatClient {
     }
 
     /**
-     * Downloads the birds and plants recorded in a place (research-grade observations), page by page.
-     * [onProgress] gets (done, total).
+     * Downloads the birds and plants recorded in a place (research-grade observations), page by page,
+     * then marks each as endemic / native / introduced using iNaturalist's place checklists.
+     * [onProgress] gets (done, total) for the main list.
      */
     suspend fun regionSpecies(
         placeId: Int,
@@ -93,28 +94,9 @@ class INatClient {
         onProgress: (Int, Int) -> Unit,
     ): List<RegionSpecies> = withContext(Dispatchers.IO) {
         val out = mutableListOf<RegionSpecies>()
-        var page = 1
-        var total = Int.MAX_VALUE
-        while (page <= maxPages && out.size < total) {
-            val json = get(
-                base.newBuilder().addPathSegments("observations/species_counts")
-                    .addQueryParameter("place_id", placeId.toString())
-                    .addQueryParameter("iconic_taxa", "Aves,Plantae")
-                    .addQueryParameter("quality_grade", "research")
-                    .addQueryParameter("locale", "en")
-                    .addQueryParameter("preferred_place_id", placeId.toString())
-                    .addQueryParameter("per_page", "500")
-                    .addQueryParameter("page", page.toString())
-                    .build(),
-            )
-            total = json.optInt("total_results", 0)
-            val results = json.optJSONArray("results") ?: break
-            if (results.length() == 0) break
-            for (i in 0 until results.length()) {
-                val r = results.getJSONObject(i)
-                val t = r.optJSONObject("taxon") ?: continue
-                val name = t.optString("name")
-                if (name.isBlank()) continue
+        speciesCounts(placeId, null, maxPages, onProgress) { r, t ->
+            val name = t.optString("name")
+            if (name.isNotBlank()) {
                 out += RegionSpecies(
                     placeId = placeId,
                     taxonId = t.optLong("id"),
@@ -128,11 +110,51 @@ class INatClient {
                         ?: t.optString("preferred_establishment_means").ifBlank { null },
                 )
             }
-            onProgress(out.size, minOf(total, maxPages * 500))
+        }
+        // Status passes: smaller lists, so they're quick. Endemic wins over native.
+        val status = mutableMapOf<Long, String>()
+        for (flag in listOf("introduced", "native", "endemic")) {
+            runCatching {
+                speciesCounts(placeId, flag, maxPages, { _, _ -> }) { _, t -> status[t.optLong("id")] = flag }
+            }
+        }
+        out.map { rs -> status[rs.taxonId]?.let { rs.copy(establishment = it) } ?: rs }
+    }
+
+    private suspend fun speciesCounts(
+        placeId: Int,
+        statusFlag: String?,
+        maxPages: Int,
+        onProgress: (Int, Int) -> Unit,
+        onTaxon: (JSONObject, JSONObject) -> Unit,
+    ) {
+        var page = 1
+        var seen = 0
+        var total = Int.MAX_VALUE
+        while (page <= maxPages && seen < total) {
+            val url = base.newBuilder().addPathSegments("observations/species_counts")
+                .addQueryParameter("place_id", placeId.toString())
+                .addQueryParameter("iconic_taxa", "Aves,Plantae")
+                .addQueryParameter("quality_grade", "research")
+                .addQueryParameter("locale", "en")
+                .addQueryParameter("preferred_place_id", placeId.toString())
+                .addQueryParameter("per_page", "500")
+                .addQueryParameter("page", page.toString())
+            if (statusFlag != null) url.addQueryParameter(statusFlag, "true")
+            val json = get(url.build())
+            total = json.optInt("total_results", 0)
+            val results = json.optJSONArray("results") ?: break
+            if (results.length() == 0) break
+            for (i in 0 until results.length()) {
+                val r = results.getJSONObject(i)
+                val t = r.optJSONObject("taxon") ?: continue
+                onTaxon(r, t)
+            }
+            seen += results.length()
+            onProgress(seen, minOf(total, maxPages * 500))
             page++
             delay(1_100) // stay well under iNaturalist's ~1 request/second guidance
         }
-        out
     }
 
     private fun get(url: HttpUrl): JSONObject {
