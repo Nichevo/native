@@ -133,7 +133,12 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
             if (st.candidates.isNotEmpty()) {
                 Text("Possible matches. Tap one to choose it.", style = MaterialTheme.typography.titleSmall)
                 st.candidates.forEach { cand ->
-                    CandidateRow(cand, st.settings.regionName, onClick = { vm.select(cand) })
+                    CandidateRow(
+                        cand,
+                        st.settings.regionName,
+                        onClick = { vm.select(cand) },
+                        selected = st.selected?.scientificName == cand.scientificName,
+                    )
                 }
             }
             st.pcNotes?.let { Text("PC AI notes: $it", style = MaterialTheme.typography.bodyMedium) }
@@ -150,6 +155,7 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
             }
 
             st.selected?.let { sel ->
+                Text("About this species", style = MaterialTheme.typography.titleSmall)
                 SpeciesInfoCard(st.selectedInfo, sel.commonName ?: sel.scientificName, st.settings.regionName, st.loadingInfo)
             }
 

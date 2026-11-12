@@ -31,6 +31,8 @@ data class Candidate(
     val note: String? = null,
     val regionMatch: RegionMatch = RegionMatch.UNKNOWN,
     val establishment: String? = null,
+    val photoUrl: String? = null,
+    val maoriName: String? = null,
 )
 
 class IdentificationException(message: String, cause: Throwable? = null) : Exception(message, cause)

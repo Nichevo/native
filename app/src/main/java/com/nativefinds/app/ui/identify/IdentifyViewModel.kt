@@ -115,6 +115,7 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
             val s = c.settings.current()
             val r = c.identifier.identify(path, _state.value.category, s)
             _state.update { it.copy(identifying = false, candidates = r.candidates, messages = r.messages) }
+            r.candidates.firstOrNull()?.let { select(it) } // show details for the best match straight away
         }
     }
 
@@ -138,6 +139,7 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
                     onFailure = { e -> st.copy(askingPc = false, messages = st.messages + (e.message ?: "PC AI failed")) },
                 )
             }
+            result.getOrNull()?.candidates?.firstOrNull()?.let { select(it) }
         }
     }
 
