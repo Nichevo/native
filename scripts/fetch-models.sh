@@ -19,7 +19,7 @@ fetch_with_kagglehub() {
   local handle="$1" out="$2"
   python3 -m pip install --quiet --disable-pip-version-check kagglehub >/dev/null 2>&1 || return 1
   local dir
-  dir="$(python3 -c "import kagglehub,sys; print(kagglehub.model_download(sys.argv[1]))" "$handle" 2>/dev/null)" || return 1
+  dir="$(python3 -c "import kagglehub,sys; print(kagglehub.model_download(sys.argv[1]))" "$handle" 2>/dev/null | tail -1)" || return 1
   local f
   f="$(find "$dir" -name '*.tflite' | head -1)"
   [ -n "$f" ] && cp "$f" "$out"
@@ -53,3 +53,20 @@ for name in "${!HANDLES[@]}"; do
     echo "::warning::Could not download the $name model; the app will build without it"
   fi
 done
+
+# Report how many common New Zealand birds the bird model knows (labels live in the model's metadata).
+if [ -s "$DEST/birds.tflite" ]; then
+  labels="$(unzip -p "$DEST/birds.tflite" '*.txt' 2>/dev/null || true)"
+  if [ -n "$labels" ]; then
+    known=0; missing=()
+    for sp in "Prosthemadera novaeseelandiae" "Hemiphaga novaeseelandiae" "Rhipidura fuliginosa" \
+              "Petroica longipes" "Anthornis melanura" "Nestor meridionalis" "Nestor notabilis" \
+              "Apteryx mantelli" "Porphyrio melanotus" "Porphyrio hochstetteri" "Gerygone igata" \
+              "Zosterops lateralis" "Mohoua albicilla" "Acanthisitta chloris" "Hymenolaimus malacorhynchos" \
+              "Gallirallus australis" "Strigops habroptilus" "Ninox novaeseelandiae" "Todiramphus sanctus" \
+              "Chroicocephalus bulleri" "Phalacrocorax varius" "Turdus merula" "Acridotheres tristis"; do
+      if grep -qi "$sp" <<<"$labels"; then known=$((known+1)); else missing+=("$sp"); fi
+    done
+    echo "Bird model knows $known of 23 common New Zealand birds. Missing: ${missing[*]:-none}"
+  fi
+fi
