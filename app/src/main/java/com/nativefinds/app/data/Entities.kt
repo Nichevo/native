@@ -42,6 +42,10 @@ data class SpeciesInfo(
     val placeId: Int?,
     val iconicTaxon: String?,
     val fetchedAt: Long,
+    /** e.g. "Rallidae (Rails, Crakes, and Coots)" */
+    val family: String? = null,
+    /** Te reo Māori name, when iNaturalist has one. */
+    val maoriName: String? = null,
 )
 
 /** Downloaded region pack header. */

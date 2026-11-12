@@ -44,9 +44,11 @@ class OnDeviceClassifier(private val context: Context) {
                     .take(max)
                     .map {
                         val label = it.label.ifBlank { it.displayName }
+                        // displayName in these models is a Knowledge Graph id like "/m/03nrd74", not a name.
+                        val display = it.displayName?.trim().orEmpty()
                         Candidate(
                             scientificName = label.trim(),
-                            commonName = it.displayName.takeIf { d -> d.isNotBlank() && d != label },
+                            commonName = display.takeIf { d -> d.isNotBlank() && d != label && !d.startsWith("/") },
                             score = it.score,
                             source = IdSource.ON_DEVICE,
                         )

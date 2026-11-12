@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,12 +57,34 @@ fun StatusChip(text: String, color: Color) {
 }
 
 @Composable
-fun CandidateRow(c: Candidate, regionName: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+fun CandidateRow(
+    c: Candidate,
+    regionName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = if (selected) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors(),
+    ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (c.photoUrl != null) {
+                    AsyncImage(
+                        model = c.photoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(c.commonName ?: c.scientificName, style = MaterialTheme.typography.titleMedium)
+                    c.maoriName?.takeIf { !it.equals(c.commonName, ignoreCase = true) }?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    }
                     if (c.commonName != null) {
                         Text(c.scientificName, fontStyle = FontStyle.Italic, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -101,7 +124,11 @@ fun SpeciesInfoCard(info: SpeciesInfo?, fallbackName: String, regionName: String
                 }
                 Column(Modifier.weight(1f)) {
                     Text(info?.commonName ?: fallbackName, style = MaterialTheme.typography.titleLarge)
+                    info?.maoriName?.takeIf { !it.equals(info.commonName, ignoreCase = true) }?.let {
+                        Text("Te reo Māori: $it", style = MaterialTheme.typography.bodyMedium)
+                    }
                     Text(info?.scientificName ?: fallbackName, fontStyle = FontStyle.Italic)
+                    info?.family?.let { Text("Family: $it", style = MaterialTheme.typography.bodySmall) }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         establishmentLabel(info?.establishment)?.let { (t, c) -> StatusChip("$t to $regionName", c) }
                     }

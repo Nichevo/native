@@ -37,6 +37,7 @@ class INatClient {
                 base.newBuilder().addPathSegment("taxa").addPathSegment(id.toString())
                     .addQueryParameter("locale", "en")
                     .addQueryParameter("preferred_place_id", placeId.toString())
+                    .addQueryParameter("all_names", "true")
                     .build(),
             ).optJSONArray("results")?.optJSONObject(0)
         }.getOrNull() ?: match
@@ -53,7 +54,33 @@ class INatClient {
             placeId = placeId,
             iconicTaxon = detail.optString("iconic_taxon_name").ifBlank { null },
             fetchedAt = System.currentTimeMillis(),
+            family = familyOf(detail),
+            maoriName = nameInLocale(detail, "mi"),
         )
+    }
+
+    private fun familyOf(taxon: JSONObject): String? {
+        val ancestors = taxon.optJSONArray("ancestors") ?: return null
+        for (i in 0 until ancestors.length()) {
+            val a = ancestors.optJSONObject(i) ?: continue
+            if (a.optString("rank") == "family") {
+                val name = a.optString("name").ifBlank { return null }
+                val common = a.optString("preferred_common_name").ifBlank { null }
+                return if (common != null) "$name ($common)" else name
+            }
+        }
+        return null
+    }
+
+    private fun nameInLocale(taxon: JSONObject, locale: String): String? {
+        val names = taxon.optJSONArray("names") ?: return null
+        for (i in 0 until names.length()) {
+            val n = names.optJSONObject(i) ?: continue
+            if (n.optString("locale") == locale && n.optBoolean("is_valid", true)) {
+                n.optString("name").ifBlank { null }?.let { return it }
+            }
+        }
+        return null
     }
 
     /**

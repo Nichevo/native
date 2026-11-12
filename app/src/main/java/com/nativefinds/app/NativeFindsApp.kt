@@ -25,7 +25,7 @@ class AppContainer(app: Application) {
     val ollama = OllamaClient()
     val regions = RegionPackRepository(db, inat)
     val species = SpeciesRepository(db, inat)
-    val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions)
+    val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions, species)
 }
 
 class NativeFindsApp : Application() {
