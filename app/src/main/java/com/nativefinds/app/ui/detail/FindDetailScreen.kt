@@ -50,6 +50,8 @@ import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.id.Category
 import com.nativefinds.app.id.PcQueueWorker
 import com.nativefinds.app.ui.common.PestBanner
+import com.nativefinds.app.ui.common.SoundPlayer
+import com.nativefinds.app.audio.isAudioPath
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import com.nativefinds.app.ui.common.formatDate
 import kotlinx.coroutines.launch
@@ -97,8 +99,12 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val paths = photos.map { it.path }.ifEmpty { listOf(f.photoPath) }
-            if (paths.size == 1) {
+            val all = photos.map { it.path }.ifEmpty { listOf(f.photoPath) }
+            val paths = all.filterNot(::isAudioPath)
+            val sounds = all.filter(::isAudioPath)
+            if (paths.isEmpty()) {
+                // Sound-only find
+            } else if (paths.size == 1) {
                 AsyncImage(
                     model = File(paths[0]),
                     contentDescription = "Your photo",
@@ -107,7 +113,7 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
                 )
             } else {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    photos.forEach { p ->
+                    photos.filterNot { isAudioPath(it.path) }.forEach { p ->
                         Column {
                             AsyncImage(
                                 model = File(p.path),
@@ -123,6 +129,7 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
                     }
                 }
             }
+            sounds.forEach { SoundPlayer(it) }
             if (f.pendingPc) {
                 Text("Waiting for your PC to check this find. It'll update when your PC is reachable.",
                     color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodyMedium)
@@ -167,7 +174,7 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
                 }) { Text("Save notes") }
             }
             val s = settings
-            if (s != null && s.pcAiConfigured && !s.offlineMode && !f.pendingPc) {
+            if (s != null && s.pcAiConfigured && !s.offlineMode && !f.pendingPc && !isAudioPath(f.photoPath)) {
                 OutlinedButton(onClick = {
                     scope.launch {
                         container.db.finds().update(f.copy(pendingPc = true))
@@ -185,7 +192,7 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
                 }
                 val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", File(f.photoPath))
                 val send = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/jpeg"
+                    type = if (isAudioPath(f.photoPath)) "audio/wav" else "image/jpeg"
                     putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_TEXT, text)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

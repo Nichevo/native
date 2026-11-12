@@ -185,16 +185,22 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
             }
             st.pcNotes?.let { Text("PC AI notes: $it", style = MaterialTheme.typography.bodyMedium) }
 
-            if (st.hasPhotos && !st.identifying) {
+            if (st.sounds.isNotEmpty() && !st.hasPhotos) {
+                Text(
+                    "This find is a sound recording. You can change the species by hand, or add a photo to identify it from that.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (st.hasMedia && !st.identifying) {
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (editFindId != null && st.candidates.isEmpty()) {
+                    if (st.hasPhotos && editFindId != null && st.candidates.isEmpty()) {
                         OutlinedButton(onClick = { vm.identify() }) { Text("Re-identify") }
                     }
-                    if (canAskPc) {
+                    if (canAskPc && st.hasPhotos) {
                         OutlinedButton(onClick = { vm.askPc() }, enabled = !st.askingPc) {
                             Icon(Icons.Filled.Computer, null); Text(if (st.askingPc) "  Asking your PC…" else "  Ask my PC")
                         }
@@ -209,7 +215,7 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                 SpeciesInfoCard(st.selectedInfo, sel.commonName ?: sel.scientificName, st.settings.regionName, st.loadingInfo)
             }
 
-            if (st.hasPhotos) {
+            if (st.hasMedia) {
                 OutlinedTextField(
                     value = st.notes,
                     onValueChange = vm::setNotes,

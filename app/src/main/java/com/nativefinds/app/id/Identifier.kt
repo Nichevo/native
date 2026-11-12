@@ -20,6 +20,7 @@ class Identifier(
     private val ollama: OllamaClient,
     private val regions: RegionPackRepository,
     private val species: SpeciesRepository,
+    private val birdSong: com.nativefinds.app.audio.BirdSongClassifier,
 ) {
     data class Result(val candidates: List<Candidate>, val messages: List<String>)
 
@@ -59,6 +60,26 @@ class Identifier(
         val merged = mergeSubspecies(raw)
         val annotated = regions.annotate(merged, settings.regionPlaceId).take(5)
         if (raw.isNotEmpty() && annotated.isEmpty()) messages += "No confident matches"
+        return Result(enrich(annotated, settings), messages)
+    }
+
+    /**
+     * Identifies birds from a sound recording (48 kHz mono) with BirdNET, on the phone.
+     * Species not recorded in the region are dropped unless [includeElsewhere].
+     */
+    suspend fun identifySong(samples: FloatArray, settings: AppSettings, includeElsewhere: Boolean): Result {
+        val messages = mutableListOf<String>()
+        if (!birdSong.isAvailable()) {
+            return Result(emptyList(), listOf("The bird-song model isn't in this build."))
+        }
+        val raw = mergeSubspecies(birdSong.toCandidates(birdSong.classify(samples, max = 25)))
+        val annotated = regions.annotate(raw, settings.regionPlaceId)
+            .filter { includeElsewhere || it.regionMatch != RegionMatch.NOT_RECORDED }
+            .take(6)
+        if (annotated.isEmpty()) {
+            messages += if (raw.isEmpty()) "No birds heard clearly. Try again closer, or for longer."
+            else "Only heard species that aren't recorded in ${settings.regionName}. Turn on \"Include other countries\" to see them."
+        }
         return Result(enrich(annotated, settings), messages)
     }
 

@@ -1,6 +1,19 @@
 package com.nativefinds.app.ui.common
 
 import android.content.Intent
+import androidx.compose.foundation.background
+import android.media.MediaPlayer
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -224,5 +237,55 @@ fun PestBanner(pest: Pest, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+/** Play / stop button for a find's sound recording. */
+@Composable
+fun SoundPlayer(path: String, modifier: Modifier = Modifier) {
+    var player by remember(path) { mutableStateOf<MediaPlayer?>(null) }
+    DisposableEffect(path) { onDispose { player?.release(); player = null } }
+    Card(modifier.fillMaxWidth()) {
+        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = {
+                val p = player
+                if (p != null) {
+                    p.release(); player = null
+                } else {
+                    player = runCatching {
+                        MediaPlayer().apply {
+                            setDataSource(path)
+                            setOnCompletionListener { it.release(); player = null }
+                            prepare()
+                            start()
+                        }
+                    }.getOrNull()
+                }
+            }) {
+                Icon(if (player != null) Icons.Filled.Stop else Icons.Filled.PlayArrow, if (player != null) "Stop" else "Play")
+            }
+            Icon(Icons.Filled.GraphicEq, null, tint = MaterialTheme.colorScheme.primary)
+            Text("  Sound recording", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** List thumbnail for a find: its photo, or a sound icon for a recording. */
+@Composable
+fun FindThumb(path: String, modifier: Modifier) {
+    if (com.nativefinds.app.audio.isAudioPath(path)) {
+        androidx.compose.foundation.layout.Box(
+            modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.GraphicEq, "Sound recording", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+        }
+    } else {
+        AsyncImage(
+            model = java.io.File(path),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(RoundedCornerShape(8.dp)),
+        )
     }
 }

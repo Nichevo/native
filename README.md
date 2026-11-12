@@ -26,6 +26,8 @@ they're native, and keeping a record of each find with its photo, GPS location a
 - **Pest alerts** (New Zealand): pest birds and weeds are flagged, with links to report unwanted organisms
   to MPI or check regional council advice. The list is in `app/src/main/assets/pests/nz.csv`.
 - **Stats**: life list with first-found dates, species per year (and new each year), and hotspots on the map.
+- **Bird song**: record a calling bird (up to 30 s) and BirdNET identifies it on the phone, offline too. Results are
+  filtered to birds recorded in your region, and the recording is saved with the find.
 
 Everything is stored on the phone. Photos are only sent to Pl@ntNet or your own PC when you ask for an
 identification; your location is never sent to an identification service.
@@ -51,6 +53,8 @@ Requires JDK 17 and the Android SDK.
 ## Credits
 
 - On-device models: Google AIY vision classifiers (birds V1, plants V1), via Kaggle Models.
+- Bird-song identification: BirdNET V2.4 (K. Lisa Yang Center for Conservation Bioacoustics, Cornell Lab of
+  Ornithology, and Chemnitz University of Technology), CC BY-NC-SA 4.0, downloaded from Zenodo at build time.
 - Plant identification: Pl@ntNet API.
 - Species data: iNaturalist API and Wikipedia.
 - Maps: OpenStreetMap contributors, via osmdroid.

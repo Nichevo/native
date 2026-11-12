@@ -56,6 +56,9 @@ class PhotoStore(private val context: Context) {
         return out
     }
 
+    /** A new file in permanent storage for a sound recording. */
+    fun newSoundFile(): File = File(photosDir, "sound-${UUID.randomUUID()}.wav")
+
     fun delete(path: String) {
         runCatching { File(path).delete() }
     }

@@ -1,5 +1,6 @@
 package com.nativefinds.app.ui.identify
 
+import com.nativefinds.app.audio.isAudioPath
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +34,8 @@ data class IdentifyState(
     val category: Category = Category.LEAF,
     val photos: List<PhotoItem> = emptyList(),
     val removedPaths: List<String> = emptyList(),
+    /** Sound recordings already on the find (kept as they are when editing). */
+    val sounds: List<String> = emptyList(),
     val latitude: Double? = null,
     val longitude: Double? = null,
     val accuracy: Float? = null,
@@ -53,6 +56,8 @@ data class IdentifyState(
     val settings: AppSettings = AppSettings(),
 ) {
     val hasPhotos get() = photos.isNotEmpty()
+    /** Photos or a kept sound recording: enough to save. */
+    val hasMedia get() = photos.isNotEmpty() || sounds.isNotEmpty()
     val mainCategory get() = photos.firstOrNull()?.category ?: category
 }
 
@@ -71,15 +76,18 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
         val f = c.db.finds().get(id) ?: return
         original = f
         val cat = runCatching { Category.valueOf(f.category) }.getOrDefault(Category.OTHER)
-        val photos = c.db.finds().photos(id).map {
+        val stored = c.db.finds().photos(id)
+        val sounds = stored.filter { isAudioPath(it.path) }.map { it.path }
+            .ifEmpty { listOfNotNull(f.photoPath.takeIf(::isAudioPath)) }
+        val photos = stored.filterNot { isAudioPath(it.path) }.map {
             PhotoItem(it.path, runCatching { Category.valueOf(it.category) }.getOrDefault(cat), isNew = false)
-        }.ifEmpty { listOf(PhotoItem(f.photoPath, cat, isNew = false)) }
+        }.ifEmpty { listOfNotNull(PhotoItem(f.photoPath, cat, isNew = false).takeUnless { isAudioPath(f.photoPath) }) }
         val sel = f.scientificName?.let {
             Candidate(it, f.commonName, f.confidence ?: 1f, IdSource.entries.firstOrNull { s -> s.label == f.idSource } ?: IdSource.MANUAL)
         }
         _state.update {
             it.copy(
-                findId = id, createdAt = f.createdAt, category = cat, photos = photos,
+                findId = id, createdAt = f.createdAt, category = cat, photos = photos, sounds = sounds,
                 latitude = f.latitude, longitude = f.longitude, accuracy = f.accuracyMeters,
                 notes = f.notes, selected = sel,
             )
@@ -234,7 +242,7 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
     /** Saves the find. With [askPcLater], it's queued for your PC to look at when it's reachable. */
     fun save(askPcLater: Boolean = false, onSaved: (Long) -> Unit) {
         val st = _state.value
-        if (!st.hasPhotos) return
+        if (!st.hasMedia) return
         viewModelScope.launch {
             _state.update { it.copy(saving = true) }
             val sel = st.selected
@@ -244,7 +252,7 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             val base = original
             val find = Find(
                 id = st.findId ?: 0,
-                photoPath = st.photos.first().path,
+                photoPath = st.photos.firstOrNull()?.path ?: st.sounds.first(),
                 createdAt = st.createdAt ?: System.currentTimeMillis(),
                 latitude = st.latitude,
                 longitude = st.longitude,
@@ -269,7 +277,8 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             }
             val now = System.currentTimeMillis()
             c.db.finds().insertPhotos(
-                st.photos.mapIndexed { i, p -> FindPhoto(findId = id, path = p.path, category = p.category.name, addedAt = now + i) },
+                st.photos.mapIndexed { i, p -> FindPhoto(findId = id, path = p.path, category = p.category.name, addedAt = now + i) } +
+                    st.sounds.mapIndexed { i, p -> FindPhoto(findId = id, path = p, category = "SOUND", addedAt = now + st.photos.size + i) },
             )
             st.removedPaths.forEach { c.photos.delete(it) }
             if (find.pendingPc) PcQueueWorker.runNow(c.appContext)

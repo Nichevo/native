@@ -12,3 +12,4 @@ app/src/main/assets/models/*.tflite
 *.keystore
 !keystore/shared-debug.keystore
 *.jks
+app/src/main/assets/models/*.txt

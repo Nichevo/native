@@ -70,3 +70,30 @@ if [ -s "$DEST/birds.tflite" ]; then
     echo "Bird model knows $known of 23 common New Zealand birds. Missing: ${missing[*]:-none}"
   fi
 fi
+
+# BirdNET V2.4 bird-sound model (CC BY-NC-SA 4.0, K. Lisa Yang Center for Conservation Bioacoustics /
+# Chemnitz University of Technology). Audio in: 3 s at 48 kHz. Not fatal if missing.
+if [ ! -s "$DEST/birdnet.tflite" ]; then
+  zip="$WORK/birdnet.zip"
+  if curl -fsSL --retry 3 -o "$zip" "https://zenodo.org/records/15050749/files/BirdNET_v2.4_tflite_fp16.zip?download=1"; then
+    rm -rf "$WORK/bn" && mkdir -p "$WORK/bn" && unzip -q "$zip" -d "$WORK/bn"
+    echo "BirdNET zip contents:"; (cd "$WORK/bn" && find . -type f | grep -v '/labels/.*_' | head -40)
+    model="$(find "$WORK/bn" -name '*.tflite' | grep -vi -e 'mdata' -e 'meta' | head -1)"
+    labels="$(find "$WORK/bn" -iname '*labels*.txt' -not -path '*/labels/*' | head -1)"
+    [ -z "$labels" ] && labels="$(find "$WORK/bn" -path '*labels*' -name 'en_us.txt' | head -1)"
+    [ -z "$labels" ] && labels="$(find "$WORK/bn" -path '*labels*' -name 'en_uk.txt' | head -1)"
+    if [ -n "$model" ] && [ -n "$labels" ]; then
+      cp "$model" "$DEST/birdnet.tflite"
+      cp "$labels" "$DEST/birdnet_labels.txt"
+      echo "✓ BirdNET: $(du -h "$DEST/birdnet.tflite" | cut -f1), $(wc -l < "$DEST/birdnet_labels.txt") labels from $(basename "$model") / $(basename "$labels")"
+      head -3 "$DEST/birdnet_labels.txt"
+      for sp in "Prosthemadera novaeseelandiae" "Anthornis melanura" "Apteryx mantelli" "Petroica longipes" "Strigops habroptilus" "Ninox novaeseelandiae"; do
+        grep -qi "$sp" "$DEST/birdnet_labels.txt" && echo "  knows $sp" || echo "  missing $sp"
+      done
+    else
+      echo "::warning::BirdNET zip had no model or labels; bird-song ID will be unavailable"
+    fi
+  else
+    echo "::warning::Could not download BirdNET; bird-song ID will be unavailable"
+  fi
+fi
