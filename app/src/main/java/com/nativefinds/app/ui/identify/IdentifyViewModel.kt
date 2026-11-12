@@ -6,10 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.AppSettings
 import com.nativefinds.app.data.Find
+import com.nativefinds.app.data.FindPhoto
 import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.id.Candidate
 import com.nativefinds.app.id.Category
 import com.nativefinds.app.id.IdSource
+import com.nativefinds.app.id.Identifier
+import com.nativefinds.app.id.PcQueueWorker
+import com.nativefinds.app.id.PcUnreachableException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,17 +22,28 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** A photo in the find being built. [isNew] photos are deleted if you leave without saving. */
+data class PhotoItem(val path: String, val category: Category, val isNew: Boolean)
+
 data class IdentifyState(
+    /** Set when editing an existing find instead of creating one. */
+    val findId: Long? = null,
+    val createdAt: Long? = null,
+    /** Category for the next photo you add. */
     val category: Category = Category.LEAF,
-    val photoPath: String? = null,
+    val photos: List<PhotoItem> = emptyList(),
+    val removedPaths: List<String> = emptyList(),
     val latitude: Double? = null,
     val longitude: Double? = null,
     val accuracy: Float? = null,
     val locating: Boolean = false,
     val identifying: Boolean = false,
     val candidates: List<Candidate> = emptyList(),
+    /** Scores from the previous run, keyed by lower-case scientific name, to show how they moved. */
+    val previousScores: Map<String, Float> = emptyMap(),
     val messages: List<String> = emptyList(),
     val askingPc: Boolean = false,
+    val pcUnreachable: Boolean = false,
     val pcNotes: String? = null,
     val selected: Candidate? = null,
     val selectedInfo: SpeciesInfo? = null,
@@ -36,20 +51,50 @@ data class IdentifyState(
     val notes: String = "",
     val saving: Boolean = false,
     val settings: AppSettings = AppSettings(),
-)
+) {
+    val hasPhotos get() = photos.isNotEmpty()
+    val mainCategory get() = photos.firstOrNull()?.category ?: category
+}
 
-class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
+class IdentifyViewModel(private val c: AppContainer, private val editFindId: Long?) : ViewModel() {
     private val _state = MutableStateFlow(IdentifyState())
     val state: StateFlow<IdentifyState> = _state
     private var pendingCapture: File? = null
+    private var original: Find? = null
 
     init {
         viewModelScope.launch { c.settings.settings.collect { s -> _state.update { it.copy(settings = s) } } }
+        if (editFindId != null) viewModelScope.launch { loadForEdit(editFindId) }
+    }
+
+    private suspend fun loadForEdit(id: Long) {
+        val f = c.db.finds().get(id) ?: return
+        original = f
+        val cat = runCatching { Category.valueOf(f.category) }.getOrDefault(Category.OTHER)
+        val photos = c.db.finds().photos(id).map {
+            PhotoItem(it.path, runCatching { Category.valueOf(it.category) }.getOrDefault(cat), isNew = false)
+        }.ifEmpty { listOf(PhotoItem(f.photoPath, cat, isNew = false)) }
+        val sel = f.scientificName?.let {
+            Candidate(it, f.commonName, f.confidence ?: 1f, IdSource.entries.firstOrNull { s -> s.label == f.idSource } ?: IdSource.MANUAL)
+        }
+        _state.update {
+            it.copy(
+                findId = id, createdAt = f.createdAt, category = cat, photos = photos,
+                latitude = f.latitude, longitude = f.longitude, accuracy = f.accuracyMeters,
+                notes = f.notes, selected = sel,
+            )
+        }
+        sel?.let { select(it) }
     }
 
     fun setCategory(cat: Category) {
         _state.update { it.copy(category = cat) }
-        if (_state.value.photoPath != null) identify()
+        // With a single photo, changing the category re-labels that photo and re-runs identification.
+        val st = _state.value
+        if (st.photos.size == 1 && st.photos[0].category != cat) {
+            _state.update { it.copy(photos = listOf(it.photos[0].copy(category = cat))) }
+            identify()
+        }
     }
 
     fun newCaptureUri(): Uri {
@@ -61,36 +106,46 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
     fun onCaptured(success: Boolean) {
         val f = pendingCapture ?: return
         if (!success || !f.exists() || f.length() == 0L) return
-        importAndIdentify(Uri.fromFile(f), exifLocation = null)
+        addPhoto(Uri.fromFile(f), exifLocation = null)
     }
 
     fun onPicked(uri: Uri?) {
         if (uri == null) return
-        importAndIdentify(uri, exifLocation = c.photos.readExifLocation(uri))
+        addPhoto(uri, exifLocation = c.photos.readExifLocation(uri))
     }
 
-    private fun importAndIdentify(uri: Uri, exifLocation: Pair<Double, Double>?) {
+    private fun addPhoto(uri: Uri, exifLocation: Pair<Double, Double>?) {
         viewModelScope.launch {
-            val old = _state.value.photoPath
             val file = runCatching { withContext(Dispatchers.IO) { c.photos.importPhoto(uri) } }.getOrElse { e ->
                 _state.update { it.copy(messages = listOf("Couldn't read the photo: ${e.message}")) }
                 return@launch
             }
-            old?.let { c.photos.delete(it) }
             c.photos.clearCaptures()
-            _state.update {
-                it.copy(
-                    photoPath = file.absolutePath, candidates = emptyList(), selected = null, selectedInfo = null,
-                    pcNotes = null, messages = emptyList(),
-                )
-            }
-            if (exifLocation != null) {
-                _state.update { it.copy(latitude = exifLocation.first, longitude = exifLocation.second, accuracy = null) }
-            } else {
-                locate()
+            val first = !_state.value.hasPhotos
+            _state.update { it.copy(photos = it.photos + PhotoItem(file.absolutePath, it.category, isNew = true)) }
+            // The find's place is where the first photo was taken; editing keeps the original place.
+            if (first && _state.value.findId == null) {
+                if (exifLocation != null) {
+                    _state.update { it.copy(latitude = exifLocation.first, longitude = exifLocation.second, accuracy = null) }
+                } else {
+                    locate()
+                }
             }
             identify()
         }
+    }
+
+    fun removePhoto(path: String) {
+        val st = _state.value
+        val item = st.photos.firstOrNull { it.path == path } ?: return
+        if (item.isNew) c.photos.delete(path)
+        _state.update {
+            it.copy(
+                photos = it.photos.filterNot { p -> p.path == path },
+                removedPaths = if (item.isNew) it.removedPaths else it.removedPaths + path,
+            )
+        }
+        if (_state.value.hasPhotos) identify() else _state.update { it.copy(candidates = emptyList()) }
     }
 
     fun locate() {
@@ -108,23 +163,32 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    private fun currentPhotos() = _state.value.photos.map { Identifier.Photo(it.path, it.category) }
+
     fun identify() {
-        val path = _state.value.photoPath ?: return
+        if (!_state.value.hasPhotos) return
         viewModelScope.launch {
-            _state.update { it.copy(identifying = true, candidates = emptyList(), messages = emptyList(), selected = null) }
+            _state.update {
+                it.copy(
+                    identifying = true,
+                    previousScores = it.candidates.associate { c -> c.scientificName.lowercase() to c.score },
+                    messages = emptyList(),
+                )
+            }
             val s = c.settings.current()
-            val r = c.identifier.identify(path, _state.value.category, s)
+            val r = c.identifier.identify(currentPhotos(), s)
+            val keepSelection = _state.value.selected?.source == IdSource.MANUAL
             _state.update { it.copy(identifying = false, candidates = r.candidates, messages = r.messages) }
-            r.candidates.firstOrNull()?.let { select(it) } // show details for the best match straight away
+            if (!keepSelection) r.candidates.firstOrNull()?.let { select(it) }
         }
     }
 
     fun askPc() {
-        val path = _state.value.photoPath ?: return
+        if (!_state.value.hasPhotos) return
         viewModelScope.launch {
-            _state.update { it.copy(askingPc = true) }
+            _state.update { it.copy(askingPc = true, pcUnreachable = false) }
             val s = c.settings.current()
-            val result = runCatching { c.identifier.secondOpinion(path, _state.value.category, s) }
+            val result = runCatching { c.identifier.secondOpinion(currentPhotos(), s) }
             _state.update { st ->
                 result.fold(
                     onSuccess = { op ->
@@ -136,7 +200,13 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
                             messages = if (op.candidates.isEmpty()) st.messages + "Your PC couldn't name a species" else st.messages,
                         )
                     },
-                    onFailure = { e -> st.copy(askingPc = false, messages = st.messages + (e.message ?: "PC AI failed")) },
+                    onFailure = { e ->
+                        st.copy(
+                            askingPc = false,
+                            pcUnreachable = e is PcUnreachableException,
+                            messages = st.messages + (e.message ?: "PC AI failed"),
+                        )
+                    },
                 )
             }
             result.getOrNull()?.candidates?.firstOrNull()?.let { select(it) }
@@ -161,40 +231,56 @@ class IdentifyViewModel(private val c: AppContainer) : ViewModel() {
 
     fun setNotes(n: String) = _state.update { it.copy(notes = n) }
 
-    fun save(onSaved: (Long) -> Unit) {
+    /** Saves the find. With [askPcLater], it's queued for your PC to look at when it's reachable. */
+    fun save(askPcLater: Boolean = false, onSaved: (Long) -> Unit) {
         val st = _state.value
-        val path = st.photoPath ?: return
+        if (!st.hasPhotos) return
         viewModelScope.launch {
             _state.update { it.copy(saving = true) }
             val sel = st.selected
             val info = st.selectedInfo
-            val id = c.db.finds().insert(
-                Find(
-                    photoPath = path,
-                    createdAt = System.currentTimeMillis(),
-                    latitude = st.latitude,
-                    longitude = st.longitude,
-                    accuracyMeters = st.accuracy,
-                    category = st.category.name,
-                    scientificName = sel?.scientificName,
-                    commonName = info?.commonName ?: sel?.commonName,
-                    confidence = sel?.score,
-                    idSource = sel?.source?.label,
-                    taxonId = info?.taxonId,
-                    establishment = info?.establishment ?: sel?.establishment,
-                    regionPlaceId = st.settings.regionPlaceId,
-                    notes = listOfNotNull(st.notes.takeIf { it.isNotBlank() }, st.pcNotes?.let { "PC AI: $it" })
-                        .joinToString("\n\n"),
-                ),
+            val notes = listOfNotNull(st.notes.takeIf { it.isNotBlank() }, st.pcNotes?.let { "PC AI: $it" })
+                .joinToString("\n\n")
+            val base = original
+            val find = Find(
+                id = st.findId ?: 0,
+                photoPath = st.photos.first().path,
+                createdAt = st.createdAt ?: System.currentTimeMillis(),
+                latitude = st.latitude,
+                longitude = st.longitude,
+                accuracyMeters = st.accuracy,
+                category = st.mainCategory.name,
+                scientificName = sel?.scientificName,
+                commonName = info?.commonName ?: sel?.commonName,
+                confidence = sel?.score,
+                idSource = sel?.source?.label,
+                taxonId = info?.taxonId,
+                establishment = info?.establishment ?: sel?.establishment,
+                regionPlaceId = base?.regionPlaceId ?: st.settings.regionPlaceId,
+                notes = notes,
+                pendingPc = askPcLater || (base?.pendingPc ?: false),
             )
-            _state.value = IdentifyState(settings = st.settings) // photo now belongs to the find
+            val id = if (st.findId == null) {
+                c.db.finds().insert(find)
+            } else {
+                c.db.finds().update(find)
+                c.db.finds().deletePhotos(st.findId)
+                st.findId
+            }
+            val now = System.currentTimeMillis()
+            c.db.finds().insertPhotos(
+                st.photos.mapIndexed { i, p -> FindPhoto(findId = id, path = p.path, category = p.category.name, addedAt = now + i) },
+            )
+            st.removedPaths.forEach { c.photos.delete(it) }
+            if (find.pendingPc) PcQueueWorker.runNow(c.appContext)
+            _state.value = IdentifyState(settings = st.settings) // photos now belong to the find
             onSaved(id)
         }
     }
 
-    /** Called when leaving without saving: remove the unsaved photo. */
+    /** Leaving without saving: remove photos added in this session only. */
     fun discard() {
-        _state.value.photoPath?.let { c.photos.delete(it) }
+        _state.value.photos.filter { it.isNew }.forEach { c.photos.delete(it.path) }
         c.photos.clearCaptures()
         _state.update { IdentifyState(settings = it.settings) }
     }

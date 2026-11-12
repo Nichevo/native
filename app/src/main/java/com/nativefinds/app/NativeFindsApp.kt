@@ -16,6 +16,7 @@ import org.osmdroid.config.Configuration
 
 /** Simple manual dependency container. */
 class AppContainer(app: Application) {
+    val appContext: android.content.Context = app
     val db = AppDatabase.create(app)
     val settings = SettingsRepository(app)
     val photos = PhotoStore(app)
@@ -35,6 +36,7 @@ class NativeFindsApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        com.nativefinds.app.id.PcQueueWorker.schedule(this)
         Configuration.getInstance().apply {
             userAgentValue = BuildConfig.APPLICATION_ID
             osmdroidBasePath = cacheDir.resolve("osmdroid")

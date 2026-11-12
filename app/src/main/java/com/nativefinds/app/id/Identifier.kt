@@ -23,24 +23,32 @@ class Identifier(
 ) {
     data class Result(val candidates: List<Candidate>, val messages: List<String>)
 
-    suspend fun identify(photoPath: String, category: Category, settings: AppSettings): Result {
-        val messages = mutableListOf<String>()
-        val raw: List<Candidate> = when {
-            category == Category.BIRD -> tryOrNote(messages) {
-                onDevice.classify(photoPath, OnDeviceClassifier.Model.BIRDS)
-            }
+    /** One photo of the find and what it shows (leaf, flower, bird...). */
+    data class Photo(val path: String, val category: Category)
 
-            category.isPlant -> {
+    /**
+     * Identifies a find from all its photos. Plants go to Pl@ntNet together (it combines organs);
+     * on-phone results from several photos are combined so agreeing photos raise the score.
+     */
+    suspend fun identify(photos: List<Photo>, settings: AppSettings): Result {
+        val messages = mutableListOf<String>()
+        if (photos.isEmpty()) return Result(emptyList(), messages)
+        val main = photos.first().category
+        val raw: List<Candidate> = when {
+            main == Category.BIRD -> onDeviceCombined(photos, OnDeviceClassifier.Model.BIRDS, messages)
+
+            main.isPlant -> {
+                val plantPhotos = photos.filter { it.category.isPlant }
                 val online = !settings.offlineMode && settings.plantNetApiKey.isNotBlank()
                 val fromPlantNet = if (online) {
-                    tryOrNote(messages) { plantNet.identify(photoPath, category.plantNetOrgan ?: "auto", settings.plantNetApiKey) }
+                    tryOrNote(messages) {
+                        plantNet.identify(plantPhotos.map { it.path to (it.category.plantNetOrgan ?: "auto") }, settings.plantNetApiKey)
+                    }
                 } else {
                     if (!settings.offlineMode) messages += "No Pl@ntNet key yet, so using the on-phone plant model"
                     emptyList()
                 }
-                fromPlantNet.ifEmpty {
-                    tryOrNote(messages) { onDevice.classify(photoPath, OnDeviceClassifier.Model.PLANTS) }
-                }
+                fromPlantNet.ifEmpty { onDeviceCombined(plantPhotos, OnDeviceClassifier.Model.PLANTS, messages) }
             }
 
             else -> {
@@ -52,6 +60,28 @@ class Identifier(
         val annotated = regions.annotate(merged, settings.regionPlaceId).take(5)
         if (raw.isNotEmpty() && annotated.isEmpty()) messages += "No confident matches"
         return Result(enrich(annotated, settings), messages)
+    }
+
+    /**
+     * Runs the on-phone model on each photo and combines them: a species' combined score is
+     * 1 - Π(1 - pᵢ), so independent photos that agree push the score up.
+     */
+    private suspend fun onDeviceCombined(
+        photos: List<Photo>,
+        model: OnDeviceClassifier.Model,
+        messages: MutableList<String>,
+    ): List<Candidate> {
+        val perPhoto = photos.map { p ->
+            mergeSubspecies(tryOrNote(messages) { onDevice.classify(p.path, model) })
+        }
+        if (perPhoto.size == 1) return perPhoto[0]
+        return perPhoto.flatten()
+            .groupBy { it.scientificName.lowercase() }
+            .map { (_, group) ->
+                val miss = group.fold(1.0) { acc, c -> acc * (1.0 - c.score.coerceIn(0f, 0.999f)) }
+                group.maxBy { it.score }.copy(score = (1.0 - miss).toFloat())
+            }
+            .sortedByDescending { it.score }
     }
 
     /**
@@ -98,9 +128,10 @@ class Identifier(
         }.awaitAll()
     }
 
-    suspend fun secondOpinion(photoPath: String, category: Category, settings: AppSettings): OllamaClient.Opinion {
+    suspend fun secondOpinion(photos: List<Photo>, settings: AppSettings): OllamaClient.Opinion {
         if (settings.offlineMode) throw IdentificationException("Offline mode is on")
-        val op = ollama.identify(photoPath, category.label, settings.regionName, settings)
+        val label = photos.map { it.category.label }.distinct().joinToString(", ")
+        val op = ollama.identify(photos.map { it.path }, label, settings.regionName, settings)
         return op.copy(candidates = enrich(regions.annotate(op.candidates, settings.regionPlaceId), settings))
     }
 

@@ -117,11 +117,20 @@ fun AppNav(container: AppContainer) {
                     },
                 )
             }
+            composable("edit/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                IdentifyScreen(
+                    container = container,
+                    editFindId = entry.arguments?.getLong("id"),
+                    onBack = { nav.popBackStack() },
+                    onSaved = { nav.popBackStack() },
+                )
+            }
             composable("find/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 FindDetailScreen(
                     container = container,
                     findId = entry.arguments?.getLong("id") ?: 0L,
                     onBack = { nav.popBackStack() },
+                    onEdit = { id -> nav.navigate("edit/$id") },
                 )
             }
         }

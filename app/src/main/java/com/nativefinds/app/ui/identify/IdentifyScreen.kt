@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -60,8 +64,8 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit) {
-    val vm: IdentifyViewModel = viewModel { IdentifyViewModel(container) }
+fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: () -> Unit, onSaved: (Long) -> Unit) {
+    val vm: IdentifyViewModel = viewModel(key = "identify-${editFindId ?: "new"}") { IdentifyViewModel(container, editFindId) }
     val st by vm.state.collectAsStateWithLifecycle()
 
     val leave = { vm.discard(); onBack() }
@@ -70,18 +74,19 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> vm.onCaptured(ok) }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> vm.onPicked(uri) }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        if (granted.values.any { it }) vm.locate()
+        if (granted.values.any { it } && editFindId == null) vm.locate()
     }
     LaunchedEffect(Unit) {
         if (!container.location.hasPermission()) {
             locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         }
     }
+    val canAskPc = st.settings.pcAiConfigured && !st.settings.offlineMode
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New find") },
+                title = { Text(if (editFindId == null) "New find" else "Edit find") },
                 navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
@@ -90,7 +95,10 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("What are you photographing?", style = MaterialTheme.typography.titleSmall)
+            Text(
+                if (st.hasPhotos) "Next photo shows:" else "What are you photographing?",
+                style = MaterialTheme.typography.titleSmall,
+            )
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Category.entries.forEach { cat ->
                     FilterChip(selected = st.category == cat, onClick = { vm.setCategory(cat) }, label = { Text(cat.label) })
@@ -100,58 +108,97 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
                 Text("Offline mode: using on-phone models only.", color = MaterialTheme.colorScheme.tertiary)
             }
 
-            if (st.photoPath != null) {
-                AsyncImage(
-                    model = File(st.photoPath!!),
-                    contentDescription = "Your photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(12.dp)),
-                )
+            if (st.hasPhotos) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    st.photos.forEach { p ->
+                        Box {
+                            AsyncImage(
+                                model = File(p.path),
+                                contentDescription = p.category.label,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(if (st.photos.size == 1) 260.dp else 150.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                            )
+                            Text(
+                                p.category.label,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.align(Alignment.BottomStart)
+                                    .background(Color(0x99000000), RoundedCornerShape(topEnd = 8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                            IconButton(onClick = { vm.removePhoto(p.path) }, modifier = Modifier.align(Alignment.TopEnd)) {
+                                Icon(Icons.Filled.Close, "Remove photo", tint = Color.White,
+                                    modifier = Modifier.background(Color(0x99000000), CircleShape))
+                            }
+                        }
+                    }
+                }
+                if (st.photos.size < 5) {
+                    Text(
+                        if (st.mainCategory.isPlant) "Tip: add a leaf, a flower and bark of the same plant for a stronger match."
+                        else "Tip: another angle of the same bird can firm up the match.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { takePicture.launch(vm.newCaptureUri()) }) {
-                    Icon(Icons.Filled.CameraAlt, null); Text("  Take photo")
+                Button(onClick = { takePicture.launch(vm.newCaptureUri()) }, enabled = st.photos.size < 5) {
+                    Icon(Icons.Filled.CameraAlt, null); Text(if (st.hasPhotos) "  Add photo" else "  Take photo")
                 }
                 OutlinedButton(onClick = {
                     pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }) {
+                }, enabled = st.photos.size < 5) {
                     Icon(Icons.Filled.Image, null); Text("  From gallery")
                 }
             }
 
-            if (st.photoPath != null) {
+            if (st.hasPhotos) {
                 LocationLine(st, onRetry = { vm.locate() })
             }
 
             if (st.identifying) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator(Modifier.size(20.dp)); Text("Identifying…")
+                    CircularProgressIndicator(Modifier.size(20.dp)); Text("Identifying from ${st.photos.size} photo${if (st.photos.size == 1) "" else "s"}…")
                 }
             }
             st.messages.forEach { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
 
             if (st.candidates.isNotEmpty()) {
-                Text("Possible matches. Tap one to choose it.", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Possible matches from ${st.photos.size} photo${if (st.photos.size == 1) "" else "s"}. Tap one to choose it.",
+                    style = MaterialTheme.typography.titleSmall,
+                )
                 st.candidates.forEach { cand ->
                     CandidateRow(
                         cand,
                         st.settings.regionName,
                         onClick = { vm.select(cand) },
                         selected = st.selected?.scientificName == cand.scientificName,
+                        previousScore = st.previousScores[cand.scientificName.lowercase()],
                     )
                 }
             }
             st.pcNotes?.let { Text("PC AI notes: $it", style = MaterialTheme.typography.bodyMedium) }
 
-            if (st.photoPath != null && !st.identifying) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (st.settings.pcAiConfigured && !st.settings.offlineMode) {
+            if (st.hasPhotos && !st.identifying) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (editFindId != null && st.candidates.isEmpty()) {
+                        OutlinedButton(onClick = { vm.identify() }) { Text("Re-identify") }
+                    }
+                    if (canAskPc) {
                         OutlinedButton(onClick = { vm.askPc() }, enabled = !st.askingPc) {
                             Icon(Icons.Filled.Computer, null); Text(if (st.askingPc) "  Asking your PC…" else "  Ask my PC")
                         }
                     }
-                    ManualEntry(onEnter = vm::enterManually)
                 }
+                ManualEntry(onEnter = vm::enterManually)
             }
 
             st.selected?.let { sel ->
@@ -159,7 +206,7 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
                 SpeciesInfoCard(st.selectedInfo, sel.commonName ?: sel.scientificName, st.settings.regionName, st.loadingInfo)
             }
 
-            if (st.photoPath != null) {
+            if (st.hasPhotos) {
                 OutlinedTextField(
                     value = st.notes,
                     onValueChange = vm::setNotes,
@@ -167,8 +214,24 @@ fun IdentifyScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) 
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                 )
-                Button(onClick = { vm.save(onSaved) }, enabled = !st.saving, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (st.selected == null) "Save as unidentified" else "Save find")
+                if (st.pcUnreachable) {
+                    OutlinedButton(onClick = { vm.save(askPcLater = true, onSaved = onSaved) }, enabled = !st.saving, modifier = Modifier.fillMaxWidth()) {
+                        Text("Save and ask my PC later")
+                    }
+                }
+                Button(onClick = { vm.save(onSaved = onSaved) }, enabled = !st.saving, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        when {
+                            editFindId != null -> "Save changes"
+                            st.selected == null -> "Save as unidentified"
+                            else -> "Save find"
+                        },
+                    )
+                }
+                if (canAskPc && !st.pcUnreachable && editFindId == null) {
+                    TextButton(onClick = { vm.save(askPcLater = true, onSaved = onSaved) }, enabled = !st.saving) {
+                        Text("Save now, let my PC check it in the background")
+                    }
                 }
             }
             Box(Modifier.height(24.dp))

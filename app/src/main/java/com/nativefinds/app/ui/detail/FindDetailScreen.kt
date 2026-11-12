@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +48,7 @@ import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.Regions
 import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.id.Category
+import com.nativefinds.app.id.PcQueueWorker
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import com.nativefinds.app.ui.common.formatDate
 import kotlinx.coroutines.launch
@@ -52,8 +56,9 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit) {
+fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
     val find by remember(findId) { container.db.finds().observe(findId) }.collectAsState(initial = null)
+    val photos by remember(findId) { container.db.finds().observePhotos(findId) }.collectAsState(initial = emptyList())
     val settings by container.settings.settings.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
@@ -79,7 +84,10 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit) 
             TopAppBar(
                 title = { Text(f?.commonName ?: f?.scientificName ?: "Find") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                actions = { IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete") } },
+                actions = {
+                    IconButton(onClick = { onEdit(findId) }) { Icon(Icons.Filled.Edit, "Edit, add photos or re-identify") }
+                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete") }
+                },
             )
         },
     ) { padding ->
@@ -88,12 +96,36 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit) 
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AsyncImage(
-                model = File(f.photoPath),
-                contentDescription = "Your photo",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(12.dp)),
-            )
+            val paths = photos.map { it.path }.ifEmpty { listOf(f.photoPath) }
+            if (paths.size == 1) {
+                AsyncImage(
+                    model = File(paths[0]),
+                    contentDescription = "Your photo",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(12.dp)),
+                )
+            } else {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    photos.forEach { p ->
+                        Column {
+                            AsyncImage(
+                                model = File(p.path),
+                                contentDescription = p.category,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(220.dp).clip(RoundedCornerShape(12.dp)),
+                            )
+                            Text(
+                                runCatching { Category.valueOf(p.category).label }.getOrDefault(p.category),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                }
+            }
+            if (f.pendingPc) {
+                Text("Waiting for your PC to check this find. It'll update when your PC is reachable.",
+                    color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodyMedium)
+            }
             val cat = runCatching { Category.valueOf(f.category).label }.getOrDefault(f.category)
             Text("$cat · ${formatDate(f.createdAt)}", style = MaterialTheme.typography.bodyMedium)
             f.idSource?.let { src ->
@@ -132,6 +164,15 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit) 
                     scope.launch { container.db.finds().update(f.copy(notes = current)); notes = null }
                 }) { Text("Save notes") }
             }
+            val s = settings
+            if (s != null && s.pcAiConfigured && !s.offlineMode && !f.pendingPc) {
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        container.db.finds().update(f.copy(pendingPc = true))
+                        PcQueueWorker.runNow(ctx)
+                    }
+                }) { Text("Ask my PC about this find") }
+            }
             OutlinedButton(onClick = {
                 val text = buildString {
                     append(f.commonName ?: f.scientificName ?: "Unidentified find")
@@ -161,8 +202,9 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit) 
                 TextButton(onClick = {
                     confirmDelete = false
                     scope.launch {
+                        val all = container.db.finds().photos(f.id).map { it.path } + f.photoPath
                         container.db.finds().delete(f)
-                        container.photos.delete(f.photoPath)
+                        all.distinct().forEach { container.photos.delete(it) }
                         onBack()
                     }
                 }) { Text("Delete") }

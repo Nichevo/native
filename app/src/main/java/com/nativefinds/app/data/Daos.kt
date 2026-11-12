@@ -25,6 +25,24 @@ interface FindDao {
     @Insert
     suspend fun insert(find: Find): Long
 
+    @Query("SELECT * FROM finds WHERE pendingPc = 1")
+    suspend fun pendingPc(): List<Find>
+
+    @Query("SELECT * FROM find_photos WHERE findId = :findId ORDER BY addedAt, id")
+    suspend fun photos(findId: Long): List<FindPhoto>
+
+    @Query("SELECT * FROM find_photos WHERE findId = :findId ORDER BY addedAt, id")
+    fun observePhotos(findId: Long): Flow<List<FindPhoto>>
+
+    @Query("SELECT * FROM find_photos")
+    suspend fun allPhotos(): List<FindPhoto>
+
+    @Insert
+    suspend fun insertPhotos(photos: List<FindPhoto>)
+
+    @Query("DELETE FROM find_photos WHERE findId = :findId")
+    suspend fun deletePhotos(findId: Long)
+
     @Update
     suspend fun update(find: Find)
 
