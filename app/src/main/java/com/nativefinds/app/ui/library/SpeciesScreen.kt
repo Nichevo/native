@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.SpeciesInfo
+import com.nativefinds.app.ui.common.PestBanner
 import com.nativefinds.app.ui.common.SpeciesInfoCard
 import com.nativefinds.app.ui.common.formatDate
 import java.io.File
@@ -72,6 +73,7 @@ fun SpeciesScreen(container: AppContainer, scientificName: String, onBack: () ->
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            settings?.let { s -> container.pests.lookup(scientificName, s.regionPlaceId)?.let { PestBanner(it) } }
             SpeciesInfoCard(info, scientificName, settings?.regionName ?: "", loading)
             if (mine.isEmpty()) {
                 Text("Not found yet.", style = MaterialTheme.typography.titleSmall)

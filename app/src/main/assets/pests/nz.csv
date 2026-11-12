@@ -1,0 +1,110 @@
+# Pest birds and plants in New Zealand. kind: mpi = report to MPI now (unwanted / not yet widespread),
+# pest = pest or weed under regional pest plans: control it and check your regional council's advice.
+# "Genus *" matches the whole genus. Columns: scientific name,kind,common name
+Trichoglossus moluccanus,mpi,Rainbow lorikeet
+Trichoglossus haematodus,mpi,Rainbow lorikeet
+Psittacula krameri,mpi,Rose-ringed parakeet
+Abutilon theophrasti,mpi,Velvetleaf
+Zizania latifolia,mpi,Manchurian wild rice
+Pueraria montana,mpi,Kudzu
+Hydrilla verticillata,mpi,Hydrilla
+Salvinia molesta,mpi,Salvinia
+Pontederia crassipes,mpi,Water hyacinth
+Eichhornia crassipes,mpi,Water hyacinth
+Phragmites australis,mpi,Phragmites
+Gymnocoronis spilanthoides,mpi,Senegal tea
+Hydrocleys nymphoides,mpi,Water poppy
+Corvus frugilegus,pest,Rook
+Acridotheres tristis,pest,Common myna
+Gymnorhina tibicen,pest,Australian magpie
+Platycercus eximius,pest,Eastern rosella
+Cacatua galerita,pest,Sulphur-crested cockatoo
+Branta canadensis,pest,Canada goose
+Alternanthera philoxeroides,pest,Alligator weed
+Spartina *,pest,Spartina
+Lythrum salicaria,pest,Purple loosestrife
+Iris pseudacorus,pest,Yellow flag iris
+Lagarosiphon major,pest,Oxygen weed
+Egeria densa,pest,Egeria
+Ceratophyllum demersum,pest,Hornwort
+Hedychium gardnerianum,pest,Kāhili ginger
+Hedychium flavescens,pest,Yellow ginger
+Clematis vitalba,pest,Old man's beard
+Tradescantia fluminensis,pest,Tradescantia (wandering willie)
+Passiflora tripartita,pest,Banana passionfruit
+Passiflora tarminiana,pest,Banana passionfruit
+Araujia hortorum,pest,Moth plant
+Araujia sericifera,pest,Moth plant
+Asparagus scandens,pest,Climbing asparagus
+Asparagus asparagoides,pest,Smilax
+Asparagus aethiopicus,pest,Bushy asparagus
+Lonicera japonica,pest,Japanese honeysuckle
+Solanum mauritianum,pest,Woolly nightshade
+Ligustrum lucidum,pest,Tree privet
+Ligustrum sinense,pest,Chinese privet
+Agapanthus praecox,pest,Agapanthus
+Cortaderia selloana,pest,Pampas
+Cortaderia jubata,pest,Purple pampas
+Berberis darwinii,pest,Darwin's barberry
+Berberis glaucocarpa,pest,Barberry
+Cobaea scandens,pest,Cathedral bells
+Hedera helix,pest,Ivy
+Lantana camara,pest,Lantana
+Ageratina adenophora,pest,Mexican devil
+Ageratina riparia,pest,Mist flower
+Tropaeolum speciosum,pest,Chilean flame creeper
+Chrysanthemoides monilifera,pest,Boneseed
+Calluna vulgaris,pest,Heather
+Akebia quinata,pest,Chocolate vine
+Rubus fruticosus,pest,Blackberry
+Rubus ulmifolius,pest,Blackberry
+Jacobaea vulgaris,pest,Ragwort
+Senecio jacobaea,pest,Ragwort
+Carduus nutans,pest,Nodding thistle
+Salix cinerea,pest,Grey willow
+Salix fragilis,pest,Crack willow
+Acer pseudoplatanus,pest,Sycamore
+Crataegus monogyna,pest,Hawthorn
+Elaeagnus reflexa,pest,Elaeagnus
+Selaginella kraussiana,pest,African club moss
+Prunus campanulata,pest,Taiwan cherry
+Reynoutria japonica,pest,Japanese knotweed
+Arundo donax,pest,Giant reed
+Zantedeschia aethiopica,pest,Arum lily
+Crocosmia x crocosmiiflora,pest,Montbretia
+Crocosmia × crocosmiiflora,pest,Montbretia
+Jasminum polyanthum,pest,Jasmine
+Cotoneaster *,pest,Cotoneaster
+Dipogon lignosus,pest,Mile-a-minute
+Ilex aquifolium,pest,Holly
+Rhamnus alaternus,pest,Evergreen buckthorn
+Nassella trichotoma,pest,Nassella tussock
+Nassella neesiana,pest,Chilean needle grass
+Ulex europaeus,pest,Gorse
+Cytisus scoparius,pest,Broom
+Pinus contorta,pest,Lodgepole pine (wilding conifer)
+Pinus nigra,pest,Corsican pine (wilding conifer)
+Pinus mugo,pest,Mountain pine (wilding conifer)
+Pinus sylvestris,pest,Scots pine (wilding conifer)
+Larix decidua,pest,European larch (wilding conifer)
+Pseudotsuga menziesii,pest,Douglas fir (wilding conifer)
+Hieracium *,pest,Hawkweed
+Pilosella *,pest,Hawkweed
+Buddleja davidii,pest,Buddleia
+Erica lusitanica,pest,Spanish heath
+Lupinus polyphyllus,pest,Russell lupin
+Vinca major,pest,Periwinkle
+Ehrharta erecta,pest,Veldt grass
+Paraserianthes lophantha,pest,Brush wattle
+Schinus terebinthifolia,pest,Brazilian pepper tree
+Cestrum *,pest,Cestrum
+Delairea odorata,pest,German ivy
+Senecio angulatus,pest,Cape ivy
+Ipomoea indica,pest,Blue morning glory
+Pittosporum undulatum,pest,Sweet pittosporum
+Rhaphiolepis umbellata,pest,Yeddo hawthorn
+Phytolacca octandra,pest,Inkweed
+Hypericum androsaemum,pest,Tutsan
+Aristea ecklonii,pest,Aristea
+Gunnera tinctoria,pest,Chilean rhubarb
+Gunnera manicata,pest,Giant rhubarb

@@ -157,6 +157,78 @@ class INatClient {
         }
     }
 
+    /** Birds and plants recorded within [radiusKm] of a point, most-seen first. [sinceDays] null = all time. */
+    suspend fun nearbySpecies(
+        lat: Double,
+        lng: Double,
+        radiusKm: Int,
+        sinceDays: Int?,
+        placeId: Int,
+    ): List<NearbySpecies> = withContext(Dispatchers.IO) {
+        val url = base.newBuilder().addPathSegments("observations/species_counts")
+            .addQueryParameter("lat", lat.toString())
+            .addQueryParameter("lng", lng.toString())
+            .addQueryParameter("radius", radiusKm.toString())
+            .addQueryParameter("iconic_taxa", "Aves,Plantae")
+            .addQueryParameter("quality_grade", "research")
+            .addQueryParameter("locale", "en")
+            .addQueryParameter("preferred_place_id", placeId.toString())
+            .addQueryParameter("per_page", "500")
+        sinceDays?.let { url.addQueryParameter("d1", isoDaysAgo(it)) }
+        val results = get(url.build()).optJSONArray("results") ?: return@withContext emptyList()
+        (0 until results.length()).mapNotNull { i ->
+            val r = results.getJSONObject(i)
+            val t = r.optJSONObject("taxon") ?: return@mapNotNull null
+            NearbySpecies(
+                taxonId = t.optLong("id"),
+                scientificName = t.optString("name").ifBlank { return@mapNotNull null },
+                commonName = t.optString("preferred_common_name").ifBlank { null },
+                iconicTaxon = t.optString("iconic_taxon_name").ifBlank { null },
+                photoUrl = t.optJSONObject("default_photo")?.optString("square_url")?.ifBlank { null },
+                count = r.optInt("count"),
+            )
+        }
+    }
+
+    /** Individual recent sightings (with coordinates) within [radiusKm] of a point, for the map. */
+    suspend fun recentSightings(
+        lat: Double,
+        lng: Double,
+        radiusKm: Int,
+        sinceDays: Int,
+        placeId: Int,
+    ): List<Sighting> = withContext(Dispatchers.IO) {
+        val url = base.newBuilder().addPathSegment("observations")
+            .addQueryParameter("lat", lat.toString())
+            .addQueryParameter("lng", lng.toString())
+            .addQueryParameter("radius", radiusKm.toString())
+            .addQueryParameter("iconic_taxa", "Aves,Plantae")
+            .addQueryParameter("quality_grade", "research")
+            .addQueryParameter("geoprivacy", "open")
+            .addQueryParameter("d1", isoDaysAgo(sinceDays))
+            .addQueryParameter("order_by", "observed_on")
+            .addQueryParameter("locale", "en")
+            .addQueryParameter("preferred_place_id", placeId.toString())
+            .addQueryParameter("per_page", "200")
+        val results = get(url.build()).optJSONArray("results") ?: return@withContext emptyList()
+        (0 until results.length()).mapNotNull { i ->
+            val o = results.getJSONObject(i)
+            val t = o.optJSONObject("taxon") ?: return@mapNotNull null
+            val coords = o.optJSONObject("geojson")?.optJSONArray("coordinates") ?: return@mapNotNull null
+            Sighting(
+                id = o.optLong("id"),
+                latitude = coords.optDouble(1),
+                longitude = coords.optDouble(0),
+                scientificName = t.optString("name"),
+                commonName = t.optString("preferred_common_name").ifBlank { null },
+                observedOn = o.optString("observed_on").ifBlank { null },
+            )
+        }
+    }
+
+    private fun isoDaysAgo(days: Int): String =
+        java.time.LocalDate.now().minusDays(days.toLong()).toString()
+
     private fun get(url: HttpUrl): JSONObject {
         val req = Request.Builder().url(url).get().build()
         Http.client.newCall(req).execute().use { resp ->
@@ -197,3 +269,21 @@ class INatClient {
         s.replace(Regex("<[^>]+>"), "").replace("&amp;", "&").replace("&quot;", "\"")
             .replace("&#39;", "'").replace("&nbsp;", " ").trim()
 }
+
+data class NearbySpecies(
+    val taxonId: Long,
+    val scientificName: String,
+    val commonName: String?,
+    val iconicTaxon: String?,
+    val photoUrl: String?,
+    val count: Int,
+)
+
+data class Sighting(
+    val id: Long,
+    val latitude: Double,
+    val longitude: Double,
+    val scientificName: String,
+    val commonName: String?,
+    val observedOn: String?,
+)

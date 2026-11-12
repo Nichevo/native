@@ -28,6 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.nativefinds.app.info.Pest
+import com.nativefinds.app.info.PestKind
+import android.app.SearchManager
 import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.id.Candidate
 import com.nativefinds.app.id.RegionMatch
@@ -65,6 +68,7 @@ fun CandidateRow(
     selected: Boolean = false,
     /** Score before the latest photo was added, to show how it moved. */
     previousScore: Float? = null,
+    pest: Pest? = null,
 ) {
     Card(
         onClick = onClick,
@@ -110,6 +114,13 @@ fun CandidateRow(
                 }
                 establishmentLabel(c.establishment)?.let { (t, col) ->
                     Text("· $t", style = MaterialTheme.typography.labelSmall, color = col)
+                }
+                pest?.let {
+                    Text(
+                        if (it.kind == PestKind.MPI) "· Report to MPI" else "· Pest",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PestRed,
+                    )
                 }
             }
             c.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
@@ -160,6 +171,56 @@ fun SpeciesInfoCard(info: SpeciesInfo?, fallbackName: String, regionName: String
                     TextButton(onClick = {
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.inaturalist.org/taxa/$id")))
                     }) { Text("iNaturalist") }
+                }
+            }
+        }
+    }
+}
+
+val PestRed = Color(0xFFC62828)
+
+/** Warning card for a pest or unwanted species, with ways to report it. */
+@Composable
+fun PestBanner(pest: Pest, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE), contentColor = Color(0xFF5F1111)),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            val name = pest.commonName.ifBlank { pest.scientificName }
+            if (pest.kind == PestKind.MPI) {
+                Text("Unwanted organism: $name", style = MaterialTheme.typography.titleMedium, color = PestRed)
+                Text(
+                    "This is a notifiable pest in New Zealand. Don't move or disturb it. Note the spot and report it to MPI " +
+                        "(Pest and Disease Hotline 0800 80 99 66).",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row {
+                    TextButton(onClick = { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800809966"))) }) { Text("Call MPI") }
+                    TextButton(onClick = {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://report.mpi.govt.nz/pest/")))
+                    }) { Text("Report online") }
+                }
+            } else {
+                Text("Pest: $name", style = MaterialTheme.typography.titleMedium, color = PestRed)
+                Text(
+                    "Listed as a pest or weed in New Zealand. Many regional councils want it controlled or reported, " +
+                        "and some can't be sold or spread.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row {
+                    TextButton(onClick = {
+                        val i = Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, "$name pest regional council NZ")
+                        runCatching { ctx.startActivity(i) }.onFailure {
+                            ctx.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://duckduckgo.com/?q=" + Uri.encode("$name pest regional council NZ"))),
+                            )
+                        }
+                    }) { Text("Council advice") }
+                    TextButton(onClick = {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.weedbusters.org.nz/")))
+                    }) { Text("Weedbusters") }
                 }
             }
         }

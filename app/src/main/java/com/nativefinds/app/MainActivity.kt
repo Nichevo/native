@@ -33,6 +33,8 @@ import com.nativefinds.app.ui.identify.IdentifyScreen
 import com.nativefinds.app.ui.library.LibraryScreen
 import com.nativefinds.app.ui.library.SpeciesScreen
 import com.nativefinds.app.ui.map.MapScreen
+import com.nativefinds.app.ui.nearby.NearbyScreen
+import com.nativefinds.app.ui.stats.StatsScreen
 import com.nativefinds.app.ui.settings.SettingsScreen
 import com.nativefinds.app.ui.theme.NativeFindsTheme
 
@@ -89,10 +91,29 @@ fun AppNav(container: AppContainer) {
                     container = container,
                     onNewFind = { nav.navigate("identify") },
                     onOpen = { id -> nav.navigate("find/$id") },
+                    onStats = { nav.navigate("stats") },
                 )
             }
             composable("library") {
-                LibraryScreen(container = container, onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) })
+                LibraryScreen(
+                    container = container,
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
+                    onNearby = { nav.navigate("nearby") },
+                )
+            }
+            composable("nearby") {
+                NearbyScreen(
+                    container = container,
+                    onBack = { nav.popBackStack() },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
+                )
+            }
+            composable("stats") {
+                StatsScreen(
+                    container = container,
+                    onBack = { nav.popBackStack() },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
+                )
             }
             composable("species/{name}") { entry ->
                 SpeciesScreen(

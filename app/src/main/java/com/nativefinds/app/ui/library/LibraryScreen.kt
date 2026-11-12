@@ -19,6 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,12 +53,13 @@ import coil.compose.AsyncImage
 import com.nativefinds.app.AppContainer
 import com.nativefinds.app.data.Find
 import com.nativefinds.app.data.RegionSpecies
+import com.nativefinds.app.ui.common.PestRed
 import com.nativefinds.app.ui.common.establishmentLabel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 private enum class Group(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants") }
-private enum class Status(val label: String) { ALL("Any status"), ENDEMIC("Endemic"), NATIVE("Native"), INTRODUCED("Introduced") }
+private enum class Status(val label: String) { ALL("Any status"), ENDEMIC("Endemic"), NATIVE("Native"), INTRODUCED("Introduced"), PESTS("Pests") }
 private enum class Seen(val label: String) { ALL("All"), FOUND("Found"), NOT_YET("Not yet") }
 private enum class Sort(val label: String) { COMMON("Most seen"), NAME("A–Z") }
 
@@ -72,7 +75,7 @@ internal fun RegionSpecies.isFound(keys: Pair<Set<Long>, Set<String>>): Boolean 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
+fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit, onNearby: () -> Unit) {
     val settings by container.settings.settings.collectAsState(initial = null)
     val placeId = settings?.regionPlaceId
     val species by remember(placeId) {
@@ -97,6 +100,7 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
             }
         }
     }
+    val isPest: (RegionSpecies) -> Boolean = { s -> container.pests.lookup(s.scientificName, s.placeId) != null }
     val shown = remember(inGroup, status, seen, sort, query, keys) {
         val q = query.trim().lowercase()
         inGroup.asSequence()
@@ -106,6 +110,7 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
                     Status.ENDEMIC -> it.establishment == "endemic"
                     Status.NATIVE -> it.establishment == "native" || it.establishment == "endemic"
                     Status.INTRODUCED -> it.establishment == "introduced"
+                    Status.PESTS -> isPest(it)
                 }
             }
             .filter {
@@ -126,7 +131,19 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
     }
     val foundInGroup = remember(inGroup, keys) { inGroup.count { it.isFound(keys) } }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Species · ${settings?.regionName ?: ""}") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Species · ${settings?.regionName ?: ""}") },
+                actions = {
+                    TextButton(onClick = onNearby) {
+                        Icon(Icons.Filled.NearMe, null)
+                        Text(" Near me")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         when {
             all == null || settings == null -> {}
             all.isEmpty() -> NoPack(container, padding, settings!!.regionPlaceId, settings!!.regionName)
@@ -154,7 +171,7 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
                         ChipRow(Group.entries, group, { it.label }) { group = it }
                         ChipRow(Seen.entries, seen, { it.label }) { seen = it }
                         ChipRow(Status.entries, status, { it.label }) { status = it }
-                        if (status != Status.ALL && all.none { it.establishment != null }) {
+                        if (status != Status.ALL && status != Status.PESTS && all.none { it.establishment != null }) {
                             Text(
                                 "This pack has no native status yet. Tap Update pack in Settings to add it.",
                                 color = MaterialTheme.colorScheme.error,
@@ -166,7 +183,7 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit) {
                     }
                 }
                 items(shown, key = { it.taxonId }) { s ->
-                    SpeciesRow(s, s.isFound(keys)) { onOpenSpecies(s.scientificName) }
+                    SpeciesRow(s, s.isFound(keys), isPest(s)) { onOpenSpecies(s.scientificName) }
                     HorizontalDivider()
                 }
             }
@@ -182,7 +199,7 @@ private fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onP
 }
 
 @Composable
-private fun SpeciesRow(s: RegionSpecies, found: Boolean, onClick: () -> Unit) {
+private fun SpeciesRow(s: RegionSpecies, found: Boolean, pest: Boolean, onClick: () -> Unit) {
     ListItem(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         leadingContent = {
@@ -204,6 +221,10 @@ private fun SpeciesRow(s: RegionSpecies, found: Boolean, onClick: () -> Unit) {
                 establishmentLabel(s.establishment)?.let { (t, c) ->
                     Spacer(Modifier.width(6.dp))
                     Text(t, color = c, style = MaterialTheme.typography.labelSmall)
+                }
+                if (pest) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("Pest", color = PestRed, style = MaterialTheme.typography.labelSmall)
                 }
             }
         },

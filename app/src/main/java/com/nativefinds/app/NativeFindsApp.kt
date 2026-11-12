@@ -21,11 +21,12 @@ class AppContainer(app: Application) {
     val settings = SettingsRepository(app)
     val photos = PhotoStore(app)
     val location = LocationProvider(app)
-    private val inat = INatClient()
+    val inat = INatClient()
     val onDevice = OnDeviceClassifier(app)
     val ollama = OllamaClient()
     val regions = RegionPackRepository(db, inat)
     val species = SpeciesRepository(db, inat)
+    val pests = com.nativefinds.app.info.PestList(app)
     val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions, species)
 }
 
