@@ -49,6 +49,12 @@ interface RegionDao {
     @Query("SELECT * FROM region_packs WHERE placeId = :placeId")
     suspend fun getPack(placeId: Int): RegionPack?
 
+    @Query("SELECT * FROM region_packs WHERE placeId = :placeId")
+    fun observePack(placeId: Int): Flow<RegionPack?>
+
+    @Query("SELECT * FROM region_species WHERE placeId = :placeId")
+    fun observeSpecies(placeId: Int): Flow<List<RegionSpecies>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putPack(pack: RegionPack)
 

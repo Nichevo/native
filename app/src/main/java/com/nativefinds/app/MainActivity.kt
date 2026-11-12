@@ -1,11 +1,13 @@
 package com.nativefinds.app
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
@@ -28,6 +30,8 @@ import androidx.navigation.navArgument
 import com.nativefinds.app.ui.detail.FindDetailScreen
 import com.nativefinds.app.ui.finds.FindsScreen
 import com.nativefinds.app.ui.identify.IdentifyScreen
+import com.nativefinds.app.ui.library.LibraryScreen
+import com.nativefinds.app.ui.library.SpeciesScreen
 import com.nativefinds.app.ui.map.MapScreen
 import com.nativefinds.app.ui.settings.SettingsScreen
 import com.nativefinds.app.ui.theme.NativeFindsTheme
@@ -47,6 +51,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val tabs = listOf(
     Tab("finds", "Finds", Icons.Filled.PhotoLibrary),
+    Tab("library", "Species", Icons.Filled.LocalFlorist),
     Tab("map", "Map", Icons.Filled.Map),
     Tab("settings", "Settings", Icons.Filled.Settings),
 )
@@ -84,6 +89,17 @@ fun AppNav(container: AppContainer) {
                     container = container,
                     onNewFind = { nav.navigate("identify") },
                     onOpen = { id -> nav.navigate("find/$id") },
+                )
+            }
+            composable("library") {
+                LibraryScreen(container = container, onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) })
+            }
+            composable("species/{name}") { entry ->
+                SpeciesScreen(
+                    container = container,
+                    scientificName = entry.arguments?.getString("name").orEmpty(),
+                    onBack = { nav.popBackStack() },
+                    onOpenFind = { id -> nav.navigate("find/$id") },
                 )
             }
             composable("map") {
