@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -117,7 +118,8 @@ fun MapScreen(container: AppContainer, onOpen: (Long) -> Unit) {
             }
             AndroidView(
                 factory = { map },
-                modifier = Modifier.fillMaxSize(),
+                // osmdroid draws tiles outside its own bounds unless clipped, covering the bars and chips
+                modifier = Modifier.fillMaxSize().clipToBounds(),
                 update = { mv ->
                     showHotspotLayer(mv, if (showHotspots) spots else emptyList())
                     showSightingLayer(mv, sightings)
