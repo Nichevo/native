@@ -26,6 +26,7 @@ class AppContainer(app: Application) {
     val ollama = OllamaClient()
     val regions = RegionPackRepository(db, inat)
     val species = SpeciesRepository(db, inat)
+    val speciesDetails = com.nativefinds.app.info.SpeciesDetailsRepository(db)
     val pests = com.nativefinds.app.info.PestList(app)
     val birdSong = com.nativefinds.app.audio.BirdSongClassifier(app)
     val identifier = Identifier(PlantNetClient(), onDevice, ollama, regions, species, birdSong)
@@ -40,7 +41,8 @@ class NativeFindsApp : Application() {
         container = AppContainer(this)
         com.nativefinds.app.id.PcQueueWorker.schedule(this)
         Configuration.getInstance().apply {
-            userAgentValue = BuildConfig.APPLICATION_ID
+            load(this@NativeFindsApp, getSharedPreferences("osmdroid", MODE_PRIVATE))
+            userAgentValue = "NativeFinds/${BuildConfig.VERSION_NAME} (Android; ${BuildConfig.APPLICATION_ID})"
             osmdroidBasePath = cacheDir.resolve("osmdroid")
             osmdroidTileCache = cacheDir.resolve("osmdroid/tiles")
         }

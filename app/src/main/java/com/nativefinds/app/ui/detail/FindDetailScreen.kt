@@ -59,7 +59,13 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, onEdit: (Long) -> Unit) {
+fun FindDetailScreen(
+    container: AppContainer,
+    findId: Long,
+    onBack: () -> Unit,
+    onEdit: (Long) -> Unit,
+    onOpenSpecies: (String) -> Unit,
+) {
     val find by remember(findId) { container.db.finds().observe(findId) }.collectAsState(initial = null)
     val photos by remember(findId) { container.db.finds().observePhotos(findId) }.collectAsState(initial = emptyList())
     val settings by container.settings.settings.collectAsState(initial = null)
@@ -158,6 +164,9 @@ fun FindDetailScreen(container: AppContainer, findId: Long, onBack: () -> Unit, 
             container.pests.lookup(f.scientificName, placeId)?.let { PestBanner(it) }
             if (f.scientificName != null) {
                 SpeciesInfoCard(info, f.commonName ?: f.scientificName, regionName, loadingInfo)
+                Button(onClick = { onOpenSpecies(f.scientificName) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("More about this species, and all your finds of it")
+                }
             }
 
             val current = notes ?: f.notes

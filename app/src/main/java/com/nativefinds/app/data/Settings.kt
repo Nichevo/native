@@ -25,6 +25,8 @@ data class AppSettings(
     /** Cloudflare Access service token (optional). */
     val cfClientId: String = "",
     val cfClientSecret: String = "",
+    /** Also put photos taken with the in-app camera into the phone's gallery (Pictures/Native Finds). */
+    val saveToGallery: Boolean = true,
 ) {
     val pcAiConfigured: Boolean get() = pcAiUrl.isNotBlank() && pcAiModel.isNotBlank()
 }
@@ -39,6 +41,7 @@ class SettingsRepository(private val context: Context) {
         val pcModel = stringPreferencesKey("pc_ai_model")
         val cfId = stringPreferencesKey("cf_client_id")
         val cfSecret = stringPreferencesKey("cf_client_secret")
+        val saveToGallery = booleanPreferencesKey("save_to_gallery")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -56,6 +59,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.pcModel] = s.pcAiModel.trim()
             prefs[Keys.cfId] = s.cfClientId.trim()
             prefs[Keys.cfSecret] = s.cfClientSecret.trim()
+            prefs[Keys.saveToGallery] = s.saveToGallery
         }
     }
 
@@ -70,6 +74,7 @@ class SettingsRepository(private val context: Context) {
             pcAiModel = this[Keys.pcModel] ?: d.pcAiModel,
             cfClientId = this[Keys.cfId] ?: d.cfClientId,
             cfClientSecret = this[Keys.cfSecret] ?: d.cfClientSecret,
+            saveToGallery = this[Keys.saveToGallery] ?: d.saveToGallery,
         )
     }
 }

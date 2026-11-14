@@ -47,6 +47,15 @@ data class FindPhoto(
     val addedAt: Long,
 )
 
+/** Cached full species page (article sections, photos, taxonomy...) as JSON, keyed by name + place. */
+@Entity(tableName = "species_details", primaryKeys = ["scientificName", "placeId"])
+data class SpeciesDetailsRow(
+    val scientificName: String,
+    val placeId: Int,
+    val json: String,
+    val fetchedAt: Long,
+)
+
 /** Cached species information, so species pages work offline once seen. */
 @Entity(tableName = "species_info")
 data class SpeciesInfo(

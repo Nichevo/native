@@ -94,6 +94,7 @@ fun AppNav(container: AppContainer) {
                     onOpen = { id -> nav.navigate("find/$id") },
                     onStats = { nav.navigate("stats") },
                     onListen = { nav.navigate("listen") },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
                 )
             }
             composable("library") {
@@ -130,6 +131,7 @@ fun AppNav(container: AppContainer) {
                     scientificName = entry.arguments?.getString("name").orEmpty(),
                     onBack = { nav.popBackStack() },
                     onOpenFind = { id -> nav.navigate("find/$id") },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
                 )
             }
             composable("map") {
@@ -161,6 +163,7 @@ fun AppNav(container: AppContainer) {
                     findId = entry.arguments?.getLong("id") ?: 0L,
                     onBack = { nav.popBackStack() },
                     onEdit = { id -> nav.navigate("edit/$id") },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
                 )
             }
         }
