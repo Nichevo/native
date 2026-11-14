@@ -161,6 +161,10 @@ fun FindDetailScreen(
                 Text("No location saved", color = MaterialTheme.colorScheme.outline)
             }
 
+            OutlinedButton(onClick = { onEdit(findId) }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Edit, null)
+                Text(if (f.scientificName == null) "  Review: identify this find" else "  Review: add photos, re-identify or change species")
+            }
             container.pests.lookup(f.scientificName, placeId)?.let { PestBanner(it) }
             if (f.scientificName != null) {
                 SpeciesInfoCard(info, f.commonName ?: f.scientificName, regionName, loadingInfo)

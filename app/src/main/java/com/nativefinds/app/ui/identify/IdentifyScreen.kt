@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -181,6 +182,40 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                         previousScore = st.previousScores[cand.scientificName.lowercase()],
                         pest = container.pests.lookup(cand.scientificName, st.settings.regionPlaceId),
                     )
+                }
+            }
+            if (!st.identifying && st.candidates.isNotEmpty() && st.photos.size < 5) {
+                val used = st.photos.map { it.category }.toSet()
+                val suggestions = if (st.mainCategory.isPlant) {
+                    listOf(Category.LEAF, Category.FLOWER, Category.FRUIT, Category.BARK, Category.WHOLE_PLANT).filterNot { it in used }
+                } else {
+                    listOf(st.mainCategory)
+                }
+                val best = st.candidates.maxOf { it.score }
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            if (best < 0.7f) "Not sure yet (best ${(best * 100).toInt()}%). Add another photo to confirm."
+                            else "Add another photo to make it more certain.",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            if (st.mainCategory.isPlant) "Photos of different parts of the same plant are combined, so the % goes up when they agree."
+                            else "Another photo of the same bird from a different angle is combined with the first.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            suggestions.forEach { cat ->
+                                OutlinedButton(onClick = {
+                                    vm.setNextCategory(cat)
+                                    takePicture.launch(vm.newCaptureUri())
+                                }) {
+                                    Icon(Icons.Filled.CameraAlt, null)
+                                    Text("  " + if (st.mainCategory.isPlant) cat.label else "Another photo")
+                                }
+                            }
+                        }
+                    }
                 }
             }
             st.pcNotes?.let { Text("PC AI notes: $it", style = MaterialTheme.typography.bodyMedium) }
