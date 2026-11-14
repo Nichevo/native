@@ -39,7 +39,8 @@ identification; your location is never sent to an identification service.
 3. In the app's **Settings**: add your Pl@ntNet key, check the region, and tap **Download pack**.
 
 New builds are published automatically on every change to `main`, and install over the old version
-without losing your finds.
+without losing your finds. Pull request builds keep their APK as an Actions artifact for one day only,
+to stay inside the private repo's 0.5 GB Actions storage.
 
 ## Build it yourself
 
