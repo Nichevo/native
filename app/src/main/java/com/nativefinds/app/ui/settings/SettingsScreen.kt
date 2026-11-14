@@ -62,6 +62,8 @@ fun SettingsScreen(container: AppContainer) {
     val packs by container.regions.packs.collectAsState(initial = emptyList())
     var status by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableStateOf<Float?>(null) }
+    var refreshProgress by remember { mutableStateOf<Float?>(null) }
+    var refreshStatus by remember { mutableStateOf<String?>(null) }
 
     fun persist(next: AppSettings) {
         draft = next
@@ -117,6 +119,27 @@ fun SettingsScreen(container: AppContainer) {
                 }
                 Switch(checked = draft.offlineMode, onCheckedChange = { persist(draft.copy(offlineMode = it)) })
             }
+
+            Text("Older finds", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Update the names, Māori names and native status of all your saved finds from iNaturalist. " +
+                    "Your species choices, photos, dates and places stay as they are. To re-identify one find, open it and tap Review.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            refreshProgress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
+            refreshStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            OutlinedButton(enabled = refreshProgress == null && !draft.offlineMode, onClick = {
+                scope.launch {
+                    refreshProgress = 0f; refreshStatus = null
+                    runCatching {
+                        container.species.refreshFinds(draft.regionPlaceId) { done, total ->
+                            refreshProgress = if (total > 0) done.toFloat() / total else 1f
+                        }
+                    }.onSuccess { refreshStatus = if (it == 0) "All finds are up to date." else "Updated $it finds." }
+                        .onFailure { refreshStatus = "Couldn't refresh: ${it.message}" }
+                    refreshProgress = null
+                }
+            }) { Text("Refresh all finds") }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

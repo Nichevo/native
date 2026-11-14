@@ -105,6 +105,9 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
         }
     }
 
+    /** Chooses what the next photo will show, without relabelling photos already taken. */
+    fun setNextCategory(cat: Category) = _state.update { it.copy(category = cat) }
+
     fun newCaptureUri(): Uri {
         val (file, uri) = c.photos.newCaptureTarget()
         pendingCapture = file
