@@ -37,6 +37,9 @@ interface FindDao {
     @Query("SELECT * FROM find_photos")
     suspend fun allPhotos(): List<FindPhoto>
 
+    @Query("SELECT * FROM find_photos ORDER BY addedAt")
+    fun observeAllPhotos(): Flow<List<FindPhoto>>
+
     @Insert
     suspend fun insertPhotos(photos: List<FindPhoto>)
 
@@ -52,6 +55,12 @@ interface FindDao {
 
 @Dao
 interface SpeciesInfoDao {
+    @Query("SELECT * FROM species_details WHERE scientificName = :name COLLATE NOCASE AND placeId = :placeId LIMIT 1")
+    suspend fun getDetails(name: String, placeId: Int): SpeciesDetailsRow?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putDetails(row: SpeciesDetailsRow)
+
     @Query("SELECT * FROM species_info WHERE scientificName = :name COLLATE NOCASE LIMIT 1")
     suspend fun get(name: String): SpeciesInfo?
 

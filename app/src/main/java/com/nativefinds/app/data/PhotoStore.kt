@@ -56,6 +56,36 @@ class PhotoStore(private val context: Context) {
         return out
     }
 
+    /**
+     * Copies a camera capture, untouched (full size, with its EXIF), into the phone's gallery under
+     * Pictures/Native Finds. Returns false if the gallery refused it.
+     */
+    fun saveToGallery(file: File): Boolean = runCatching {
+        val name = "NativeFinds_${System.currentTimeMillis()}.jpg"
+        val resolver = context.contentResolver
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Native Finds")
+                put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: return false
+            values.clear()
+            values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        } else {
+            @Suppress("DEPRECATION")
+            val dir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "Native Finds")
+            dir.mkdirs()
+            val dest = File(dir, name)
+            file.copyTo(dest)
+            android.media.MediaScannerConnection.scanFile(context, arrayOf(dest.path), arrayOf("image/jpeg"), null)
+        }
+        true
+    }.getOrDefault(false)
+
     /** A new file in permanent storage for a sound recording. */
     fun newSoundFile(): File = File(photosDir, "sound-${UUID.randomUUID()}.wav")
 

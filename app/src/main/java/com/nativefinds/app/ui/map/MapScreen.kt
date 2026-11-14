@@ -29,6 +29,27 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.view.ViewGroup
+import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
+import kotlinx.coroutines.launch
+import org.osmdroid.tileprovider.tilesource.ITileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.MapTileIndex
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.overlay.CopyrightOverlay
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -46,6 +67,38 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import java.util.Calendar
+
+/** Map backgrounds. Standard is OpenStreetMap; Topo shows contours and tracks; Satellite is aerial imagery. */
+enum class MapStyle(val label: String, val source: ITileSource) {
+    STANDARD("Standard", TileSourceFactory.MAPNIK),
+    TOPO("Topo", TileSourceFactory.OpenTopo),
+    SATELLITE("Satellite", EsriImagery),
+}
+
+private object EsriImagery : OnlineTileSourceBase(
+    "EsriWorldImagery", 0, 19, 256, "",
+    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"),
+    "Imagery © Esri, Maxar, Earthstar Geographics",
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String =
+        baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex)
+}
+
+private class MeMarker(map: MapView) : Marker(map)
+
+private fun showMe(map: MapView, me: GeoPoint?) {
+    map.overlays.removeAll { it is MeMarker }
+    if (me == null) return
+    map.overlays.add(
+        MeMarker(map).apply {
+            position = me
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            icon = icon?.mutate()?.also { it.colorFilter = PorterDuffColorFilter(AColor.rgb(25, 118, 210), PorterDuff.Mode.SRC_ATOP) }
+            title = "You are here"
+        },
+    )
+    map.invalidate()
+}
 
 /** Markers we add, tagged so each layer can be cleared on its own. */
 private class FindMarker(map: MapView) : Marker(map)
@@ -71,17 +124,55 @@ fun MapScreen(container: AppContainer, onOpen: (Long) -> Unit) {
     val spots = remember(located) { hotspots(located) }
     val ctx = LocalContext.current
     val open by rememberUpdatedState(onOpen)
+    var style by rememberSaveable { mutableStateOf(MapStyle.STANDARD) }
+    var me by remember { mutableStateOf<GeoPoint?>(null) }
+    var locating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val map = remember {
         MapView(ctx).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(style.source)
             setMultiTouchControls(true)
+            // Map tiles stop at zoom 19; osmdroid would otherwise zoom to 29 and show an empty grid.
+            minZoomLevel = 3.0
+            maxZoomLevel = 19.0
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.SHOW_AND_FADEOUT)
             controller.setZoom(5.5)
             controller.setCenter(GeoPoint(-41.0, 174.0)) // New Zealand until there are finds
+            overlays.add(CopyrightOverlay(ctx))
         }
     }
-    DisposableEffect(map) {
-        map.onResume()
-        onDispose { map.onPause(); map.onDetach() }
+    // The map sits inside a frame that clips to its own bounds, so tiles can never be drawn over
+    // the top bar, the chips or the bottom tabs (Compose doesn't clip Android views for us).
+    val holder = remember {
+        FrameLayout(ctx).apply {
+            clipChildren = true
+            clipToPadding = true
+            outlineProvider = ViewOutlineProvider.BOUNDS
+            clipToOutline = true
+            addView(map, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(map, lifecycle) {
+        val observer = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_RESUME -> map.onResume()
+                Lifecycle.Event.ON_PAUSE -> map.onPause()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) map.onResume()
+        onDispose {
+            lifecycle.removeObserver(observer)
+            map.onPause()
+            map.onDetach()
+        }
+    }
+    LaunchedEffect(style) {
+        map.setTileSource(style.source)
+        map.maxZoomLevel = style.source.maximumZoomLevel.toDouble().coerceAtMost(19.0)
+        map.invalidate()
     }
 
     LaunchedEffect(showSightings) {
@@ -112,21 +203,60 @@ fun MapScreen(container: AppContainer, onOpen: (Long) -> Unit) {
                 FilterChip(selected = showHotspots, onClick = { showHotspots = !showHotspots }, label = { Text("Hotspots") })
                 FilterChip(selected = showSightings, onClick = { showSightings = !showSightings }, label = { Text("Seen nearby") })
             }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MapStyle.entries.forEach { m ->
+                    FilterChip(selected = style == m, onClick = { style = m }, label = { Text(m.label) })
+                }
+            }
+            if (settings?.offlineMode == true) {
+                Text(
+                    "Offline mode: only map areas you've already viewed will show.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                )
+            }
             if (loadingSightings) LinearProgressIndicator(Modifier.fillMaxWidth())
             sightingsMsg?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
             }
-            AndroidView(
-                factory = { map },
-                // osmdroid draws tiles outside its own bounds unless clipped, covering the bars and chips
-                modifier = Modifier.fillMaxSize().clipToBounds(),
-                update = { mv ->
-                    showHotspotLayer(mv, if (showHotspots) spots else emptyList())
-                    showSightingLayer(mv, sightings)
-                    showFinds(mv, located, fit = !fitted && !showSightings) { open(it) }
-                    if (located.isNotEmpty()) fitted = true
-                },
-            )
+            Box(Modifier.fillMaxSize().clipToBounds()) {
+                AndroidView(
+                    factory = { holder },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { _ ->
+                        showHotspotLayer(map, if (showHotspots) spots else emptyList())
+                        showSightingLayer(map, sightings)
+                        showMe(map, me)
+                        showFinds(map, located, fit = !fitted && !showSightings) { open(it) }
+                        if (located.isNotEmpty()) fitted = true
+                    },
+                )
+                SmallFloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            locating = true
+                            val loc = container.location.current()
+                            locating = false
+                            if (loc != null) {
+                                val p = GeoPoint(loc.latitude, loc.longitude)
+                                me = p
+                                fitted = true
+                                map.controller.setZoom(15.0)
+                                map.controller.animateTo(p)
+                            } else {
+                                sightingsMsg = "Couldn't get your location. Check location permission and GPS."
+                            }
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                ) {
+                    if (locating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Filled.MyLocation, "Centre on me")
+                }
+            }
         }
     }
 }
@@ -152,7 +282,15 @@ private fun showFinds(map: MapView, finds: List<Find>, fit: Boolean, onOpen: (Lo
             map.controller.setCenter(GeoPoint(finds[0].latitude!!, finds[0].longitude!!))
         } else if (finds.size > 1) {
             val box = BoundingBox.fromGeoPoints(finds.map { GeoPoint(it.latitude!!, it.longitude!!) })
-            map.post { map.zoomToBoundingBox(box.increaseByScale(1.3f), false, 64) }
+            map.post {
+                // Finds close together would zoom in past the last tile level: cap it at street level.
+                if (box.latitudeSpan < 0.005 && box.longitudeSpanWithDateLine < 0.005) {
+                    map.controller.setZoom(16.0)
+                    map.controller.setCenter(box.centerWithDateLine)
+                } else {
+                    map.zoomToBoundingBox(box.increaseByScale(1.3f), false, 64, 16.0, null)
+                }
+            }
         }
     }
     map.invalidate()

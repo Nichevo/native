@@ -114,7 +114,13 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
     fun onCaptured(success: Boolean) {
         val f = pendingCapture ?: return
         if (!success || !f.exists() || f.length() == 0L) return
-        addPhoto(Uri.fromFile(f), exifLocation = null)
+        viewModelScope.launch {
+            if (_state.value.settings.saveToGallery) {
+                val ok = withContext(Dispatchers.IO) { c.photos.saveToGallery(f) }
+                if (!ok) _state.update { it.copy(messages = it.messages + "Couldn't also save the photo to your gallery") }
+            }
+            addPhoto(Uri.fromFile(f), exifLocation = null)
+        }
     }
 
     fun onPicked(uri: Uri?) {

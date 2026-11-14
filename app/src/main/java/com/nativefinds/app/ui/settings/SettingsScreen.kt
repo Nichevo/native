@@ -117,6 +117,15 @@ fun SettingsScreen(container: AppContainer) {
                 }
                 Switch(checked = draft.offlineMode, onCheckedChange = { persist(draft.copy(offlineMode = it)) })
             }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Save photos to gallery", style = MaterialTheme.typography.titleSmall)
+                    Text("Photos taken in the app are also saved to your phone's gallery, in the Native Finds album.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = draft.saveToGallery, onCheckedChange = { persist(draft.copy(saveToGallery = it)) })
+            }
             val birds = container.onDevice.isAvailable(OnDeviceClassifier.Model.BIRDS)
             val plants = container.onDevice.isAvailable(OnDeviceClassifier.Model.PLANTS)
             Text(

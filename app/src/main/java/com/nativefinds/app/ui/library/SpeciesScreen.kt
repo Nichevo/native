@@ -40,22 +40,34 @@ import com.nativefinds.app.data.SpeciesInfo
 import com.nativefinds.app.ui.common.FindThumb
 import com.nativefinds.app.ui.common.PestBanner
 import com.nativefinds.app.ui.common.SpeciesInfoCard
+import com.nativefinds.app.ui.common.SpeciesDetailsView
 import com.nativefinds.app.ui.common.formatDate
 import java.io.File
 
 /** A species from the library: its details, and every find of it you've saved. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeciesScreen(container: AppContainer, scientificName: String, onBack: () -> Unit, onOpenFind: (Long) -> Unit) {
+fun SpeciesScreen(
+    container: AppContainer,
+    scientificName: String,
+    onBack: () -> Unit,
+    onOpenFind: (Long) -> Unit,
+    onOpenSpecies: (String) -> Unit,
+) {
     val settings by container.settings.settings.collectAsState(initial = null)
     val finds by container.db.finds().observeAll().collectAsState(initial = emptyList())
     var info by remember { mutableStateOf<SpeciesInfo?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var details by remember { mutableStateOf<com.nativefinds.app.info.SpeciesDetails?>(null) }
+    var loadingDetails by remember { mutableStateOf(false) }
     LaunchedEffect(scientificName, settings?.regionPlaceId) {
         val s = settings ?: return@LaunchedEffect
         loading = true
         info = container.species.info(scientificName, s.regionPlaceId, s.offlineMode)
         loading = false
+        loadingDetails = true
+        details = container.speciesDetails.details(scientificName, info?.taxonId, s.regionPlaceId, s.offlineMode)
+        loadingDetails = false
     }
     val key = speciesKey(scientificName)
     val mine = finds.filter { f ->
@@ -91,6 +103,18 @@ fun SpeciesScreen(container: AppContainer, scientificName: String, onBack: () ->
                         }
                     }
                 }
+            }
+            settings?.let { st ->
+                SpeciesDetailsView(
+                    details = details,
+                    loading = loadingDetails,
+                    scientificName = scientificName,
+                    commonName = info?.commonName,
+                    isBird = info?.iconicTaxon == "Aves" || mine.any { it.category == "BIRD" },
+                    placeId = st.regionPlaceId,
+                    regionName = st.regionName,
+                    onOpenSpecies = onOpenSpecies,
+                )
             }
         }
     }
