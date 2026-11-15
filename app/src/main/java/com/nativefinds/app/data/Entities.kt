@@ -101,3 +101,21 @@ data class RegionSpecies(
     val observations: Int,
     val establishment: String?,
 )
+
+/** A saved place such as "My garden": every find within [radiusMeters] of the centre belongs to it. */
+@Entity(tableName = "places")
+data class Place(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Float,
+    val createdAt: Long,
+) {
+    fun contains(lat: Double?, lng: Double?): Boolean {
+        if (lat == null || lng == null) return false
+        val out = FloatArray(1)
+        android.location.Location.distanceBetween(latitude, longitude, lat, lng, out)
+        return out[0] <= radiusMeters
+    }
+}

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -156,6 +157,35 @@ fun FindDetailScreen(
                         val label = Uri.encode(f.commonName ?: f.scientificName ?: "Find")
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${f.latitude},${f.longitude}($label)")))
                     }) { Text("Open in maps") }
+                }
+                val places by container.db.places().observeAll().collectAsState(initial = emptyList())
+                val inPlaces = places.filter { it.contains(f.latitude, f.longitude) }
+                var savingPlace by remember { mutableStateOf(false) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (inPlaces.isEmpty()) "Not in any of your places" else "In " + inPlaces.joinToString { it.name },
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { savingPlace = true }) { Text("Save spot as a place") }
+                }
+                if (savingPlace) {
+                    com.nativefinds.app.ui.places.PlaceDialog(
+                        title = "New place",
+                        initialName = if (places.isEmpty()) "My garden" else "",
+                        initialRadius = 50f,
+                        onDismiss = { savingPlace = false },
+                    ) { name, radius ->
+                        scope.launch {
+                            container.db.places().insert(
+                                com.nativefinds.app.data.Place(
+                                    name = name, latitude = f.latitude, longitude = f.longitude,
+                                    radiusMeters = radius, createdAt = System.currentTimeMillis(),
+                                ),
+                            )
+                        }
+                        savingPlace = false
+                    }
                 }
             } else {
                 Text("No location saved", color = MaterialTheme.colorScheme.outline)

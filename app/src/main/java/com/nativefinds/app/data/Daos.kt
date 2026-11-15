@@ -105,3 +105,18 @@ interface RegionDao {
     @Query("SELECT COUNT(*) FROM region_species WHERE placeId = :placeId AND scientificName LIKE :genus || ' %'")
     suspend fun countGenus(placeId: Int, genus: String): Int
 }
+
+@Dao
+interface PlaceDao {
+    @Query("SELECT * FROM places ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<Place>>
+
+    @Insert
+    suspend fun insert(place: Place): Long
+
+    @Update
+    suspend fun update(place: Place)
+
+    @Delete
+    suspend fun delete(place: Place)
+}

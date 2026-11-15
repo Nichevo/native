@@ -21,6 +21,8 @@ they're native, and keeping a record of each find with its photo, GPS location a
 - **Offline mode**: on-phone models and cached data only, with no internet calls. Handy where Google
   and Wikipedia are blocked, or there's no signal.
 - **Finds**: list with search, a map (OpenStreetMap), notes, sharing, and CSV export.
+- **My places**: save spots like "My garden" with a size (25 m to 1 km). Finds inside a place are grouped there
+  automatically, so you can filter finds by place and see its species list. Places show on the map.
 - **Seen near you**: birds and plants others have recorded on iNaturalist within 1 to 25 km, ticked when
   you've found them, and a map layer of the last 30 days' sightings.
 - **Pest alerts** (New Zealand): pest birds and weeds are flagged, with links to report unwanted organisms
