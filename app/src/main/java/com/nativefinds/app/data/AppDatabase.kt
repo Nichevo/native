@@ -8,20 +8,30 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class],
-    version = 4,
+    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class, Place::class],
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun finds(): FindDao
     abstract fun speciesInfo(): SpeciesInfoDao
     abstract fun regions(): RegionDao
+    abstract fun places(): PlaceDao
 
     companion object {
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "native-finds.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `places` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `radiusMeters` REAL NOT NULL, `createdAt` INTEGER NOT NULL)",
+                )
+            }
+        }
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {

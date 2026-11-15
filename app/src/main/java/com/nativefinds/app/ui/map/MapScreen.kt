@@ -110,6 +110,7 @@ private class HotspotCircle : Polygon()
 fun MapScreen(container: AppContainer, onOpen: (Long) -> Unit) {
     val finds by container.db.finds().observeAll().collectAsState(initial = emptyList())
     val settings by container.settings.settings.collectAsState(initial = null)
+    val places by container.db.places().observeAll().collectAsState(initial = emptyList())
     val thisYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
     var onlyThisYear by rememberSaveable { mutableStateOf(false) }
     var showHotspots by rememberSaveable { mutableStateOf(false) }
@@ -228,6 +229,7 @@ fun MapScreen(container: AppContainer, onOpen: (Long) -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     update = { _ ->
                         showHotspotLayer(map, if (showHotspots) spots else emptyList())
+                        showPlaceLayer(map, places)
                         showSightingLayer(map, sightings)
                         showMe(map, me)
                         showFinds(map, located, fit = !fitted && !showSightings) { open(it) }
@@ -325,6 +327,24 @@ private fun showHotspotLayer(map: MapView, spots: List<Hotspot>) {
             outlinePaint.strokeWidth = 3f
             title = "${h.species} species · ${h.finds} finds"
             snippet = h.topNames.joinToString(", ")
+        }
+        map.overlays.add(0, c)
+    }
+    map.invalidate()
+}
+
+private class PlaceCircle : Polygon()
+
+/** Your saved places ("My garden" etc.) as blue outlines. */
+private fun showPlaceLayer(map: MapView, places: List<com.nativefinds.app.data.Place>) {
+    map.overlays.removeAll { it is PlaceCircle }
+    places.forEach { p ->
+        val c = PlaceCircle().apply {
+            setPoints(Polygon.pointsAsCircle(GeoPoint(p.latitude, p.longitude), p.radiusMeters.toDouble()))
+            fillPaint.color = AColor.argb(40, 21, 101, 192)
+            outlinePaint.color = AColor.argb(220, 21, 101, 192)
+            outlinePaint.strokeWidth = 4f
+            title = p.name
         }
         map.overlays.add(0, c)
     }

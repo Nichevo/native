@@ -86,6 +86,8 @@ fun FindsScreen(
     var sort by rememberSaveable { mutableStateOf(SortBy.NEWEST) }
     var view by rememberSaveable { mutableStateOf(View.LIST) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var placeFilter by rememberSaveable { mutableStateOf(-1L) }
+    val places by container.db.places().observeAll().collectAsState(initial = emptyList())
     val photosByFind = remember(photos) { photos.groupBy { it.findId } }
 
     Scaffold(
@@ -120,7 +122,9 @@ fun FindsScreen(
                 val q = query.trim().lowercase()
                 val now = System.currentTimeMillis()
                 fun photoCount(f: Find) = photosByFind[f.id]?.count { !isAudioPath(it.path) } ?: (if (isAudioPath(f.photoPath)) 0 else 1)
+                val place = places.firstOrNull { it.id == placeFilter }
                 val filtered = list.asSequence()
+                    .filter { place == null || place.contains(it.latitude, it.longitude) }
                     .filter { q.isEmpty() || listOfNotNull(it.commonName, it.scientificName, it.notes).any { s -> s.lowercase().contains(q) } }
                     .filter {
                         when (kind) {
@@ -151,7 +155,7 @@ fun FindsScreen(
                     SortBy.NAME -> filtered.sortedBy { (it.commonName ?: it.scientificName ?: "~").lowercase() }
                     SortBy.PHOTOS -> filtered.sortedByDescending { photoCount(it) }
                 }
-                val groups = remember(shown) {
+                val groups = remember(shown, place) {
                     shown.groupBy { f -> f.scientificName?.trim()?.split(Regex("\\s+"))?.take(2)?.joinToString(" ")?.lowercase() ?: "" }
                         .map { (k, fs) ->
                             SpeciesGroup(
@@ -186,6 +190,13 @@ fun FindsScreen(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            if (places.isNotEmpty()) {
+                                Chips(listOf(-1L) + places.map { it.id }, if (place == null) -1L else placeFilter, { id ->
+                                    if (id == -1L) "Everywhere" else places.first { it.id == id }.let { p ->
+                                        "${p.name} (${list.count { f -> p.contains(f.latitude, f.longitude) }})"
+                                    }
+                                }) { placeFilter = it }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Chips(View.entries, view, { it.label }) { view = it }
                                 Spacer(Modifier.weight(1f))
@@ -204,7 +215,8 @@ fun FindsScreen(
                                 }
                             }
                             Text(
-                                if (view == View.LIST) "${shown.size} of ${list.size} finds" else "${groups.size} species · ${shown.size} finds",
+                                (place?.let { "${it.name}: " } ?: "") +
+                                    if (view == View.LIST) "${shown.size} of ${list.size} finds" else "${groups.size} species · ${shown.size} finds",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.outline,
                             )

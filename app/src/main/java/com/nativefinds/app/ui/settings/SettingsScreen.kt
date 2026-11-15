@@ -120,6 +120,8 @@ fun SettingsScreen(container: AppContainer) {
                 Switch(checked = draft.offlineMode, onCheckedChange = { persist(draft.copy(offlineMode = it)) })
             }
 
+            com.nativefinds.app.ui.places.PlacesSection(container)
+
             Text("Older finds", style = MaterialTheme.typography.titleSmall)
             Text(
                 "Update the names, Māori names and native status of all your saved finds from iNaturalist. " +
