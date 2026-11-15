@@ -43,7 +43,7 @@ class SightingAlerts(private val c: AppContainer) {
         val everyday = everydaySet(pack)
         val found = c.db.finds().getAll().mapNotNull { it.scientificName?.let(::speciesKey) }.toSet()
 
-        val centres = buildList {
+        val centres = buildList<Triple<String, Double, Double>> {
             c.db.places().all().forEach { add(Triple(it.name, it.latitude, it.longitude)) }
             c.state.lastLocation?.let { (lat, lng) ->
                 val nearAPlace = any { (_, pl, pg) -> distanceKm(lat, lng, pl, pg) < s.alertRadiusKm / 2.0 }
