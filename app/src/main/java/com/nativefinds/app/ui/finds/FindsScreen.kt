@@ -57,7 +57,7 @@ import com.nativefinds.app.ui.common.establishmentLabel
 import com.nativefinds.app.ui.common.formatDate
 import java.io.File
 
-private enum class Kind(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants"), SOUNDS("Sounds"), UNIDENTIFIED("Unidentified"), UNSURE("Needs review") }
+private enum class Kind(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants"), BUGS("Bugs"), LIZARDS("Lizards"), SOUNDS("Sounds"), UNIDENTIFIED("Unidentified"), UNSURE("Needs review") }
 private enum class Origin(val label: String) { ANY("Any status"), NATIVE("Native"), ENDEMIC("Endemic"), INTRODUCED("Introduced"), PESTS("Pests") }
 private enum class When(val label: String, val days: Int?) { ANY("Any time", null), WEEK("Last 7 days", 7), MONTH("Last 30 days", 30), YEAR("Last 12 months", 365) }
 private enum class SortBy(val label: String) { NEWEST("Newest"), OLDEST("Oldest"), NAME("Name A–Z"), PHOTOS("Most photos") }
@@ -126,6 +126,8 @@ fun FindsScreen(
                         when (kind) {
                             Kind.ALL -> true
                             Kind.BIRDS -> it.category == Category.BIRD.name
+                            Kind.BUGS -> it.category == Category.INSECT.name
+                            Kind.LIZARDS -> it.category == Category.LIZARD.name
                             Kind.PLANTS -> runCatching { Category.valueOf(it.category).isPlant }.getOrDefault(false)
                             Kind.SOUNDS -> isAudioPath(it.photoPath) || photosByFind[it.id].orEmpty().any { p -> isAudioPath(p.path) }
                             Kind.UNIDENTIFIED -> it.scientificName == null

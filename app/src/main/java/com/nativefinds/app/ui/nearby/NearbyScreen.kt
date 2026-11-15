@@ -56,7 +56,7 @@ private enum class Radius(val km: Int, val label: String) { NEAR(1, "1 km"), LOC
 private enum class Period(val days: Int?, val label: String) {
     MONTH(30, "Last 30 days"), SEASON(90, "Last 3 months"), YEAR(365, "Last year"), ALL(null, "All time")
 }
-private enum class Group(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants"), NOT_FOUND("Not found yet") }
+private enum class Group(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants"), BUGS("Bugs"), LIZARDS("Lizards"), NOT_FOUND("Not found yet") }
 
 /** What other people have recorded (iNaturalist, research grade) around where you are now. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +100,8 @@ fun NearbyScreen(container: AppContainer, onBack: () -> Unit, onOpenSpecies: (St
             Group.ALL -> true
             Group.BIRDS -> it.iconicTaxon == "Aves"
             Group.PLANTS -> it.iconicTaxon == "Plantae"
+            Group.BUGS -> it.iconicTaxon == "Insecta" || it.iconicTaxon == "Arachnida"
+            Group.LIZARDS -> it.iconicTaxon == "Reptilia"
             Group.NOT_FOUND -> !found(it)
         }
     }

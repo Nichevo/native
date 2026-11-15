@@ -48,6 +48,7 @@ fun SpeciesDetailsView(
     scientificName: String,
     commonName: String?,
     isBird: Boolean,
+    isPlant: Boolean = !isBird,
     placeId: Int,
     regionName: String,
     onOpenSpecies: (String) -> Unit,
@@ -138,7 +139,7 @@ fun SpeciesDetailsView(
                     ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://duckduckgo.com/?q=site%3Anzbirdsonline.org.nz+$q")))
                 }) { Text("NZ Birds Online") }
             }
-            if (placeId == Regions.NEW_ZEALAND.placeId && !isBird) {
+            if (placeId == Regions.NEW_ZEALAND.placeId && isPlant) {
                 TextButton(onClick = {
                     val slug = scientificName.trim().lowercase().split(Regex("\\s+")).take(2).joinToString("-")
                     ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.nzpcn.org.nz/flora/species/$slug/")))

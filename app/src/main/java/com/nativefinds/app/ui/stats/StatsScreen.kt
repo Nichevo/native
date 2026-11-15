@@ -52,7 +52,7 @@ import java.util.Date
 import kotlin.math.roundToInt
 
 /** One species on the life list: first time you found it, and how often since. */
-data class LifeEntry(val key: String, val name: String, val scientificName: String, val first: Find, val count: Int, val isBird: Boolean)
+data class LifeEntry(val key: String, val name: String, val scientificName: String, val first: Find, val count: Int, val isBird: Boolean, val category: String)
 
 data class Hotspot(val lat: Double, val lng: Double, val finds: Int, val species: Int, val topNames: List<String>)
 
@@ -72,6 +72,7 @@ fun lifeList(finds: List<Find>): List<LifeEntry> =
                 first = first,
                 count = fs.size,
                 isBird = first.category == "BIRD",
+                category = first.category,
             )
         }
         .sortedByDescending { it.first.createdAt }
@@ -130,8 +131,13 @@ fun StatsScreen(container: AppContainer, onBack: () -> Unit, onOpenSpecies: (Str
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Tile("Birds", life.count { it.isBird }.toString(), Modifier.weight(1f))
-                Tile("Plants", life.count { !it.isBird }.toString(), Modifier.weight(1f))
+                Tile("Plants", life.count { e -> runCatching { com.nativefinds.app.id.Category.valueOf(e.category).isPlant }.getOrDefault(false) }.toString(), Modifier.weight(1f))
                 Tile("Endemic", endemicSpecies.toString(), Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Tile("Bugs", life.count { it.category == "INSECT" }.toString(), Modifier.weight(1f))
+                Tile("Lizards", life.count { it.category == "LIZARD" }.toString(), Modifier.weight(1f))
+                Tile("Sounds", finds.count { it.photoPath.endsWith(".wav", true) }.toString(), Modifier.weight(1f))
             }
 
             Text("By year", style = MaterialTheme.typography.titleMedium)

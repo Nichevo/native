@@ -58,7 +58,7 @@ import com.nativefinds.app.ui.common.establishmentLabel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
-private enum class Group(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants") }
+private enum class Group(val label: String) { ALL("All"), BIRDS("Birds"), PLANTS("Plants"), BUGS("Bugs"), LIZARDS("Lizards") }
 private enum class Status(val label: String) { ALL("Any status"), ENDEMIC("Endemic"), NATIVE("Native"), INTRODUCED("Introduced"), PESTS("Pests") }
 private enum class Seen(val label: String) { ALL("All"), FOUND("Found"), NOT_YET("Not yet") }
 private enum class Sort(val label: String) { COMMON("Most seen"), NAME("A–Z") }
@@ -97,6 +97,8 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit, onNe
                 Group.ALL -> true
                 Group.BIRDS -> it.iconicTaxon == "Aves"
                 Group.PLANTS -> it.iconicTaxon == "Plantae"
+                Group.BUGS -> it.iconicTaxon == "Insecta" || it.iconicTaxon == "Arachnida"
+                Group.LIZARDS -> it.iconicTaxon == "Reptilia"
             }
         }
     }
@@ -169,6 +171,13 @@ fun LibraryScreen(container: AppContainer, onOpenSpecies: (String) -> Unit, onNe
                             modifier = Modifier.fillMaxWidth(),
                         )
                         ChipRow(Group.entries, group, { it.label }) { group = it }
+                        if ((group == Group.BUGS || group == Group.LIZARDS) && inGroup.isEmpty()) {
+                            Text(
+                                "This pack was downloaded before bugs and lizards were added. Tap Update pack in Settings to add them.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                         ChipRow(Seen.entries, seen, { it.label }) { seen = it }
                         ChipRow(Status.entries, status, { it.label }) { status = it }
                         if (status != Status.ALL && status != Status.PESTS && all.none { it.establishment != null }) {
@@ -247,7 +256,7 @@ private fun NoPack(container: AppContainer, padding: PaddingValues, placeId: Int
         Modifier.padding(padding).fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Download the $regionName pack to see every bird and plant recorded there, and tick them off as you find them.")
+        Text("Download the $regionName pack to see every bird, plant, bug and lizard recorded there, and tick them off as you find them.")
         Text("It takes about a minute and works offline afterwards.", style = MaterialTheme.typography.bodySmall)
         progress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
