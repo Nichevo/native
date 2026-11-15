@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
@@ -75,6 +76,8 @@ fun FindsScreen(
     onStats: () -> Unit,
     onListen: () -> Unit,
     onOpenSpecies: (String) -> Unit,
+    onOpenPlace: (Long) -> Unit = {},
+    onCount: () -> Unit = {},
 ) {
     val finds by container.db.finds().observeAll().collectAsState(initial = null)
     val photos by container.db.finds().observeAllPhotos().collectAsState(initial = emptyList())
@@ -94,7 +97,10 @@ fun FindsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("My finds") },
-                actions = { IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats and life list") } },
+                actions = {
+                    IconButton(onClick = onCount) { Icon(Icons.Filled.Visibility, "Start a bird count") }
+                    IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats and life list") }
+                },
             )
         },
         floatingActionButton = {
@@ -196,6 +202,9 @@ fun FindsScreen(
                                         "${p.name} (${list.count { f -> p.contains(f.latitude, f.longitude) }})"
                                     }
                                 }) { placeFilter = it }
+                                place?.let { p ->
+                                    TextButton(onClick = { onOpenPlace(p.id) }) { Text("${p.name}: through the year and bird counts") }
+                                }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Chips(View.entries, view, { it.label }) { view = it }

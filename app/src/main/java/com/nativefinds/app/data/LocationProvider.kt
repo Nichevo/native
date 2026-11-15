@@ -28,6 +28,8 @@ class LocationProvider(private val context: Context) {
             runCatching { client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token).await() }.getOrNull()
         }
         if (fix == null) cts.cancel()
-        return fix ?: runCatching { client.lastLocation.await() }.getOrNull()
+        val loc = fix ?: runCatching { client.lastLocation.await() }.getOrNull()
+        loc?.let { AppState(context).lastLocation = it.latitude to it.longitude }
+        return loc
     }
 }

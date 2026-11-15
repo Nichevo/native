@@ -45,8 +45,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as NativeFindsApp).container
         setContent {
-            NativeFindsTheme { AppNav(container) }
+            NativeFindsTheme { AppNav(container, startRoute.value) { startRoute.value = null } }
         }
+    }
+
+    private val startRoute = androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    override fun onStart() {
+        super.onStart()
+        intent?.getStringExtra(com.nativefinds.app.alerts.AlertNotifier.EXTRA_ROUTE)?.let {
+            startRoute.value = it
+            intent.removeExtra(com.nativefinds.app.alerts.AlertNotifier.EXTRA_ROUTE)
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 }
 
@@ -60,8 +75,11 @@ private val tabs = listOf(
 )
 
 @Composable
-fun AppNav(container: AppContainer) {
+fun AppNav(container: AppContainer, openRoute: String? = null, onOpened: () -> Unit = {}) {
     val nav = rememberNavController()
+    androidx.compose.runtime.LaunchedEffect(openRoute) {
+        if (openRoute != null) { nav.navigate(openRoute); onOpened() }
+    }
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     Scaffold(
@@ -94,6 +112,8 @@ fun AppNav(container: AppContainer) {
                     onOpen = { id -> nav.navigate("find/$id") },
                     onStats = { nav.navigate("stats") },
                     onListen = { nav.navigate("listen") },
+                    onOpenPlace = { id -> nav.navigate("place/$id") },
+                    onCount = { nav.navigate("count/0") },
                     onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
                 )
             }
@@ -116,6 +136,31 @@ fun AppNav(container: AppContainer) {
                     container = container,
                     onBack = { nav.popBackStack() },
                     onSaved = { id -> nav.navigate("find/$id") { popUpTo("finds") } },
+                    onChorus = { nav.navigate("chorus") },
+                )
+            }
+            composable("chorus") {
+                com.nativefinds.app.ui.listen.ChorusScreen(
+                    container = container,
+                    onBack = { nav.popBackStack() },
+                    onSaved = { nav.navigate("finds") { popUpTo("finds") { inclusive = true } } },
+                )
+            }
+            composable("place/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                com.nativefinds.app.ui.places.PlaceScreen(
+                    container = container,
+                    placeId = entry.arguments?.getLong("id") ?: 0L,
+                    onBack = { nav.popBackStack() },
+                    onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
+                    onStartCount = { id -> nav.navigate("count/$id") },
+                )
+            }
+            composable("count/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                com.nativefinds.app.ui.places.CountScreen(
+                    container = container,
+                    placeId = entry.arguments?.getLong("id")?.takeIf { it > 0 },
+                    onBack = { nav.popBackStack() },
+                    onSaved = { nav.popBackStack() },
                 )
             }
             composable("stats") {
@@ -138,7 +183,7 @@ fun AppNav(container: AppContainer) {
                 MapScreen(container = container, onOpen = { id -> nav.navigate("find/$id") })
             }
             composable("settings") {
-                SettingsScreen(container = container)
+                SettingsScreen(container = container, onOpenPlace = { id -> nav.navigate("place/$id") })
             }
             composable("identify") {
                 IdentifyScreen(

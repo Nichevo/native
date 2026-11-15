@@ -27,7 +27,17 @@ data class AppSettings(
     val cfClientSecret: String = "",
     /** Also put photos taken with the in-app camera into the phone's gallery (Pictures/Native Finds). */
     val saveToGallery: Boolean = true,
+    /** Dropbox app key (from the user's own Dropbox app) and the sign-in it gave us. */
+    val dropboxAppKey: String = "",
+    val dropboxRefreshToken: String = "",
+    /** Back up to Dropbox once a day, on Wi-Fi. */
+    val autoBackup: Boolean = true,
+    /** Notify about unusual species seen near your places or where you last used the app. */
+    val alertsEnabled: Boolean = false,
+    val alertRadiusKm: Int = 10,
 ) {
+    val dropboxConnected: Boolean get() = dropboxAppKey.isNotBlank() && dropboxRefreshToken.isNotBlank()
+
     val pcAiConfigured: Boolean get() = pcAiUrl.isNotBlank() && pcAiModel.isNotBlank()
 }
 
@@ -42,6 +52,11 @@ class SettingsRepository(private val context: Context) {
         val cfId = stringPreferencesKey("cf_client_id")
         val cfSecret = stringPreferencesKey("cf_client_secret")
         val saveToGallery = booleanPreferencesKey("save_to_gallery")
+        val dropboxKey = stringPreferencesKey("dropbox_app_key")
+        val dropboxToken = stringPreferencesKey("dropbox_refresh_token")
+        val autoBackup = booleanPreferencesKey("auto_backup")
+        val alerts = booleanPreferencesKey("alerts_enabled")
+        val alertRadius = intPreferencesKey("alert_radius_km")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -60,6 +75,11 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.cfId] = s.cfClientId.trim()
             prefs[Keys.cfSecret] = s.cfClientSecret.trim()
             prefs[Keys.saveToGallery] = s.saveToGallery
+            prefs[Keys.dropboxKey] = s.dropboxAppKey.trim()
+            prefs[Keys.dropboxToken] = s.dropboxRefreshToken.trim()
+            prefs[Keys.autoBackup] = s.autoBackup
+            prefs[Keys.alerts] = s.alertsEnabled
+            prefs[Keys.alertRadius] = s.alertRadiusKm
         }
     }
 
@@ -75,6 +95,11 @@ class SettingsRepository(private val context: Context) {
             cfClientId = this[Keys.cfId] ?: d.cfClientId,
             cfClientSecret = this[Keys.cfSecret] ?: d.cfClientSecret,
             saveToGallery = this[Keys.saveToGallery] ?: d.saveToGallery,
+            dropboxAppKey = this[Keys.dropboxKey] ?: d.dropboxAppKey,
+            dropboxRefreshToken = this[Keys.dropboxToken] ?: d.dropboxRefreshToken,
+            autoBackup = this[Keys.autoBackup] ?: d.autoBackup,
+            alertsEnabled = this[Keys.alerts] ?: d.alertsEnabled,
+            alertRadiusKm = this[Keys.alertRadius] ?: d.alertRadiusKm,
         )
     }
 }

@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class, Place::class],
-    version = 5,
+    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class, Place::class, BirdCount::class, BirdCountEntry::class],
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -17,12 +17,31 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun speciesInfo(): SpeciesInfoDao
     abstract fun regions(): RegionDao
     abstract fun places(): PlaceDao
+    abstract fun counts(): BirdCountDao
 
     companion object {
+        const val NAME = "native-finds.db"
+
         fun create(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "native-finds.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            Room.databaseBuilder(context, AppDatabase::class.java, NAME)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `bird_counts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `placeId` INTEGER, " +
+                        "`placeName` TEXT, `startedAt` INTEGER NOT NULL, `minutes` INTEGER NOT NULL, `latitude` REAL, `longitude` REAL, " +
+                        "`notes` TEXT NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `bird_count_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`countId` INTEGER NOT NULL, `scientificName` TEXT NOT NULL, `commonName` TEXT, `count` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`countId`) REFERENCES `bird_counts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bird_count_entries_countId` ON `bird_count_entries` (`countId`)")
+            }
+        }
 
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {

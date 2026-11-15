@@ -37,7 +37,7 @@ fun sizeLabel(m: Float): String = if (m >= 1000f) "${(m / 1000f).let { if (it % 
 
 /** "My places" section for Settings: list saved places and add one where you are standing. */
 @Composable
-fun PlacesSection(container: AppContainer) {
+fun PlacesSection(container: AppContainer, onOpenPlace: (Long) -> Unit = {}) {
     val places by container.db.places().observeAll().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var adding by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -56,6 +56,7 @@ fun PlacesSection(container: AppContainer) {
                 Text(p.name, style = MaterialTheme.typography.bodyLarge)
                 Text("Within ${sizeLabel(p.radiusMeters)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
+            TextButton(onClick = { onOpenPlace(p.id) }) { Text("Open") }
             TextButton(onClick = { editing = p }) { Text("Edit") }
             IconButton(onClick = { scope.launch { container.db.places().delete(p) } }) { Icon(Icons.Filled.Delete, "Remove ${p.name}") }
         }
