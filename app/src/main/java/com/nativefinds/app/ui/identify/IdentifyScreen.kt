@@ -140,7 +140,7 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                 if (st.photos.size < 5) {
                     Text(
                         if (st.mainCategory.isPlant) "Tip: add a leaf, a flower and bark of the same plant for a stronger match."
-                        else "Tip: another angle of the same bird can firm up the match.",
+                        else "Tip: another angle of the same animal can firm up the match.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
@@ -201,7 +201,7 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                         )
                         Text(
                             if (st.mainCategory.isPlant) "Photos of different parts of the same plant are combined, so the % goes up when they agree."
-                            else "Another photo of the same bird from a different angle is combined with the first.",
+                            else "Another photo of the same animal from a different angle is combined with the first.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

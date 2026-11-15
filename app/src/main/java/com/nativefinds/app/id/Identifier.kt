@@ -38,6 +38,15 @@ class Identifier(
         val raw: List<Candidate> = when {
             main == Category.BIRD -> onDeviceCombined(photos, OnDeviceClassifier.Model.BIRDS, messages)
 
+            main == Category.INSECT -> onDeviceCombined(
+                photos.filter { it.category == Category.INSECT }, OnDeviceClassifier.Model.INSECTS, messages,
+            )
+
+            main == Category.LIZARD -> {
+                messages += "There's no free on-phone lizard model yet. Tap Ask my PC, or pick from the region's lizards by hand."
+                emptyList()
+            }
+
             main.isPlant -> {
                 val plantPhotos = photos.filter { it.category.isPlant }
                 val online = !settings.offlineMode && settings.plantNetApiKey.isNotBlank()

@@ -8,6 +8,8 @@ enum class Category(val label: String, val plantNetOrgan: String?, val isPlant: 
     FRUIT("Fruit / seed", "fruit", true),
     BARK("Bark", "bark", true),
     WHOLE_PLANT("Whole plant", "auto", true),
+    INSECT("Bug / insect", null, false),
+    LIZARD("Lizard / gecko", null, false),
     OTHER("Something else", null, false),
 }
 

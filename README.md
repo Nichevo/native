@@ -5,7 +5,7 @@ they're native, and keeping a record of each find with its photo, GPS location a
 
 ## What it does
 
-- **Photograph** a bird, leaf, flower, fruit, bark or whole plant (or pick a photo from the gallery).
+- **Photograph** a bird, insect or other bug, lizard, leaf, flower, fruit, bark or whole plant (or pick a photo from the gallery).
 - **Identify** it:
   - Plants: [Pl@ntNet](https://my.plantnet.org) online (free key, 500 IDs a day), or an on-phone
     plant model (~2,100 species) when offline.
@@ -53,7 +53,7 @@ Requires JDK 17 and the Android SDK.
 
 ## Credits
 
-- On-device models: Google AIY vision classifiers (birds V1, plants V1), via Kaggle Models.
+- On-device models: Google AIY vision classifiers (birds V1, plants V1, insects V1), via Kaggle Models.
 - Bird-song identification: BirdNET V2.4 (K. Lisa Yang Center for Conservation Bioacoustics, Cornell Lab of
   Ornithology, and Chemnitz University of Technology), CC BY-NC-SA 4.0, downloaded from Zenodo at build time.
 - Plant identification: Pl@ntNet API.

@@ -111,6 +111,8 @@ fun SpeciesScreen(
                     scientificName = scientificName,
                     commonName = info?.commonName,
                     isBird = info?.iconicTaxon == "Aves" || mine.any { it.category == "BIRD" },
+                    isPlant = info?.iconicTaxon == "Plantae" ||
+                        mine.any { f -> runCatching { com.nativefinds.app.id.Category.valueOf(f.category).isPlant }.getOrDefault(false) },
                     placeId = st.regionPlaceId,
                     regionName = st.regionName,
                     onOpenSpecies = onOpenSpecies,

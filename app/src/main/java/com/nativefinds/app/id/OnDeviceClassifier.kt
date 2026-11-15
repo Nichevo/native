@@ -14,7 +14,11 @@ import org.tensorflow.lite.task.vision.classifier.ImageClassifier
  * names; "background" / "None" labels are dropped.
  */
 class OnDeviceClassifier(private val context: Context) {
-    enum class Model(val asset: String) { BIRDS("models/birds.tflite"), PLANTS("models/plants.tflite") }
+    enum class Model(val asset: String) {
+        BIRDS("models/birds.tflite"),
+        PLANTS("models/plants.tflite"),
+        INSECTS("models/insects.tflite"),
+    }
 
     private val loaded = mutableMapOf<Model, ImageClassifier>()
     private val lock = Mutex()

@@ -90,7 +90,7 @@ class INatClient {
      */
     suspend fun regionSpecies(
         placeId: Int,
-        maxPages: Int = 20,
+        maxPages: Int = 40,
         onProgress: (Int, Int) -> Unit,
     ): List<RegionSpecies> = withContext(Dispatchers.IO) {
         val out = mutableListOf<RegionSpecies>()
@@ -134,7 +134,7 @@ class INatClient {
         while (page <= maxPages && seen < total) {
             val url = base.newBuilder().addPathSegments("observations/species_counts")
                 .addQueryParameter("place_id", placeId.toString())
-                .addQueryParameter("iconic_taxa", "Aves,Plantae")
+                .addQueryParameter("iconic_taxa", ICONIC_TAXA)
                 .addQueryParameter("quality_grade", "research")
                 .addQueryParameter("locale", "en")
                 .addQueryParameter("preferred_place_id", placeId.toString())
@@ -169,7 +169,7 @@ class INatClient {
             .addQueryParameter("lat", lat.toString())
             .addQueryParameter("lng", lng.toString())
             .addQueryParameter("radius", radiusKm.toString())
-            .addQueryParameter("iconic_taxa", "Aves,Plantae")
+            .addQueryParameter("iconic_taxa", ICONIC_TAXA)
             .addQueryParameter("quality_grade", "research")
             .addQueryParameter("locale", "en")
             .addQueryParameter("preferred_place_id", placeId.toString())
@@ -202,7 +202,7 @@ class INatClient {
             .addQueryParameter("lat", lat.toString())
             .addQueryParameter("lng", lng.toString())
             .addQueryParameter("radius", radiusKm.toString())
-            .addQueryParameter("iconic_taxa", "Aves,Plantae")
+            .addQueryParameter("iconic_taxa", ICONIC_TAXA)
             .addQueryParameter("quality_grade", "research")
             .addQueryParameter("geoprivacy", "open")
             .addQueryParameter("d1", isoDaysAgo(sinceDays))
@@ -287,3 +287,6 @@ data class Sighting(
     val commonName: String?,
     val observedOn: String?,
 )
+
+/** What region packs, nearby sightings and the library cover: birds, plants, insects, spiders and reptiles. */
+const val ICONIC_TAXA = "Aves,Plantae,Insecta,Arachnida,Reptilia"

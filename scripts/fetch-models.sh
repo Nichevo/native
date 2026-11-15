@@ -13,6 +13,7 @@ trap 'rm -rf "$WORK"' EXIT
 declare -A HANDLES=(
   [birds]="google/aiy/tfLite/vision-classifier-birds-v1"
   [plants]="google/aiy/tfLite/vision-classifier-plants-v1"
+  [insects]="google/aiy/tfLite/vision-classifier-insects-v1"
 )
 
 fetch_with_kagglehub() {
