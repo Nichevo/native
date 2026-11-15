@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Moves the SHA-pinned actions in .github/workflows forward (keeps the
+  # version comment in step).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Gradle plugins and libraries (build.gradle.kts, settings.gradle.kts).
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
