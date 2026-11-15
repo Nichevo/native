@@ -23,6 +23,14 @@ they're native, and keeping a record of each find with its photo, GPS location a
 - **Finds**: list with search, a map (OpenStreetMap), notes, sharing, and CSV export.
 - **My places**: save spots like "My garden" with a size (25 m to 1 km). Finds inside a place are grouped there
   automatically, so you can filter finds by place and see its species list. Places show on the map.
+  Each place has a "through the year" page showing the months each species turns up.
+- **Bird counts**: a timed tally (10 to 60 minutes) of the most of each species seen at once, the way the
+  NZ Garden Bird Survey counts, saved against a place.
+- **Dawn chorus**: listen for up to 30 minutes in 30-second clips and save every bird heard as its own find.
+- **Unusual species alerts** (optional): a notification when something uncommon that you haven't found is
+  seen on iNaturalist near your places. Everyday species, introduced species and pests are left out.
+- **Dropbox backup**: finds, photos and sounds to your own Dropbox app folder, daily on Wi-Fi, with restore
+  for a new phone. You create a Dropbox app and paste its App key into Settings; nothing is built in.
 - **Seen near you**: birds and plants others have recorded on iNaturalist within 1 to 25 km, ticked when
   you've found them, and a map layer of the last 30 days' sightings.
 - **Pest alerts** (New Zealand): pest birds and weeds are flagged, with links to report unwanted organisms

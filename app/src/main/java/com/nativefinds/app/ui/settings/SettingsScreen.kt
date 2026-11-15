@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(container: AppContainer) {
+fun SettingsScreen(container: AppContainer, onOpenPlace: (Long) -> Unit = {}) {
     val saved by container.settings.settings.collectAsState(initial = null)
     val s = saved ?: return
     // Local editable copy so typing doesn't fight DataStore round-trips.
@@ -67,7 +67,18 @@ fun SettingsScreen(container: AppContainer) {
 
     fun persist(next: AppSettings) {
         draft = next
-        scope.launch { container.settings.update { next } }
+        // Backup and alert settings are saved by their own sections; keep whatever they last stored.
+        scope.launch {
+            container.settings.update { cur ->
+                next.copy(
+                    dropboxAppKey = cur.dropboxAppKey,
+                    dropboxRefreshToken = cur.dropboxRefreshToken,
+                    autoBackup = cur.autoBackup,
+                    alertsEnabled = cur.alertsEnabled,
+                    alertRadiusKm = cur.alertRadiusKm,
+                )
+            }
+        }
     }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
@@ -120,7 +131,9 @@ fun SettingsScreen(container: AppContainer) {
                 Switch(checked = draft.offlineMode, onCheckedChange = { persist(draft.copy(offlineMode = it)) })
             }
 
-            com.nativefinds.app.ui.places.PlacesSection(container)
+            com.nativefinds.app.ui.places.PlacesSection(container, onOpenPlace)
+
+            AlertsSection(container)
 
             Text("Older finds", style = MaterialTheme.typography.titleSmall)
             Text(
@@ -227,6 +240,7 @@ fun SettingsScreen(container: AppContainer) {
 
             HorizontalDivider()
             Section("Your data")
+            DropboxSection(container)
             OutlinedButton(onClick = {
                 scope.launch { ctx.startActivity(CsvExporter.shareIntent(ctx, container.db)) }
             }) { Text("Export finds to CSV") }

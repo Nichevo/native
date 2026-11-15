@@ -185,7 +185,7 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit) {
+fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit, onChorus: () -> Unit = {}) {
     val vm: ListenViewModel = viewModel { ListenViewModel(container) }
     val st by vm.state.collectAsState()
     val ctx = LocalContext.current
@@ -216,6 +216,9 @@ fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) ->
                     "so this works offline too.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (!st.recording && st.pcm == null) {
+                OutlinedButton(onClick = onChorus) { Text("Dawn chorus: listen for longer and list every bird") }
+            }
             if (st.recording) {
                 Text("Listening… ${st.seconds.toInt()} s", style = MaterialTheme.typography.titleMedium)
                 LinearProgressIndicator(progress = { st.level.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())

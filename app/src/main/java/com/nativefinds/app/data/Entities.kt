@@ -119,3 +119,30 @@ data class Place(
         return out[0] <= radiusMeters
     }
 }
+
+/** A timed bird count, like the NZ Garden Bird Survey: the most of each species seen at one time. */
+@Entity(tableName = "bird_counts")
+data class BirdCount(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** The saved place it was done at, if any (the place's name is kept in case it's deleted). */
+    val placeId: Long?,
+    val placeName: String?,
+    val startedAt: Long,
+    val minutes: Int,
+    val latitude: Double?,
+    val longitude: Double?,
+    val notes: String = "",
+)
+
+@Entity(
+    tableName = "bird_count_entries",
+    foreignKeys = [ForeignKey(entity = BirdCount::class, parentColumns = ["id"], childColumns = ["countId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("countId")],
+)
+data class BirdCountEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val countId: Long,
+    val scientificName: String,
+    val commonName: String?,
+    val count: Int,
+)

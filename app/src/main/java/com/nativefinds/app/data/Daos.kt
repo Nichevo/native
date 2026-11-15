@@ -82,6 +82,9 @@ interface RegionDao {
     @Query("SELECT * FROM region_species WHERE placeId = :placeId")
     fun observeSpecies(placeId: Int): Flow<List<RegionSpecies>>
 
+    @Query("SELECT * FROM region_species WHERE placeId = :placeId")
+    suspend fun species(placeId: Int): List<RegionSpecies>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putPack(pack: RegionPack)
 
@@ -111,6 +114,12 @@ interface PlaceDao {
     @Query("SELECT * FROM places ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<Place>>
 
+    @Query("SELECT * FROM places ORDER BY name COLLATE NOCASE")
+    suspend fun all(): List<Place>
+
+    @Query("SELECT * FROM places WHERE id = :id")
+    fun observe(id: Long): Flow<Place?>
+
     @Insert
     suspend fun insert(place: Place): Long
 
@@ -119,4 +128,22 @@ interface PlaceDao {
 
     @Delete
     suspend fun delete(place: Place)
+}
+
+@Dao
+interface BirdCountDao {
+    @Query("SELECT * FROM bird_counts ORDER BY startedAt DESC")
+    fun observeAll(): Flow<List<BirdCount>>
+
+    @Query("SELECT * FROM bird_count_entries")
+    fun observeAllEntries(): Flow<List<BirdCountEntry>>
+
+    @Insert
+    suspend fun insert(count: BirdCount): Long
+
+    @Insert
+    suspend fun insertEntries(entries: List<BirdCountEntry>)
+
+    @Delete
+    suspend fun delete(count: BirdCount)
 }
