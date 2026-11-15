@@ -95,7 +95,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
