@@ -22,7 +22,14 @@ class Identifier(
     private val species: SpeciesRepository,
     private val birdSong: com.nativefinds.app.audio.BirdSongClassifier,
 ) {
-    data class Result(val candidates: List<Candidate>, val messages: List<String>)
+    data class Result(
+        val candidates: List<Candidate>,
+        val messages: List<String>,
+        /** Each photo's own top matches, when photos were identified one by one and then combined. */
+        val perPhoto: List<PhotoResult> = emptyList(),
+        /** How the scores were worked out, in plain words. */
+        val method: String? = null,
+    )
 
     /** One photo of the find and what it shows (leaf, flower, bird...). */
     data class Photo(val path: String, val category: Category)
@@ -35,12 +42,25 @@ class Identifier(
         val messages = mutableListOf<String>()
         if (photos.isEmpty()) return Result(emptyList(), messages)
         val main = photos.first().category
+        val perPhoto = mutableListOf<PhotoResult>()
+        var method: String? = null
+        fun onDeviceMethod(model: String, n: Int) {
+            method = if (n == 1) "On-phone $model model, from 1 photo."
+            else "On-phone $model model run on each of the $n photos separately, then combined: " +
+                "combined % = 1 − (1 − photo 1 %) × (1 − photo 2 %) × …, so photos that agree push the % up, " +
+                "and a species only one photo sees keeps that photo's %."
+        }
         val raw: List<Candidate> = when {
-            main == Category.BIRD -> onDeviceCombined(photos, OnDeviceClassifier.Model.BIRDS, messages)
+            main == Category.BIRD -> {
+                onDeviceMethod("bird", photos.size)
+                onDeviceCombined(photos, OnDeviceClassifier.Model.BIRDS, messages, perPhoto)
+            }
 
-            main == Category.INSECT -> onDeviceCombined(
-                photos.filter { it.category == Category.INSECT }, OnDeviceClassifier.Model.INSECTS, messages,
-            )
+            main == Category.INSECT -> {
+                val insectPhotos = photos.filter { it.category == Category.INSECT }
+                onDeviceMethod("insect", insectPhotos.size)
+                onDeviceCombined(insectPhotos, OnDeviceClassifier.Model.INSECTS, messages, perPhoto)
+            }
 
             main == Category.LIZARD -> {
                 messages += "There's no free on-phone lizard model yet. Tap Ask my PC, or pick from the region's lizards by hand."
@@ -58,7 +78,15 @@ class Identifier(
                     if (!settings.offlineMode) messages += "No Pl@ntNet key yet, so using the on-phone plant model"
                     emptyList()
                 }
-                fromPlantNet.ifEmpty { onDeviceCombined(plantPhotos, OnDeviceClassifier.Model.PLANTS, messages) }
+                if (fromPlantNet.isNotEmpty()) {
+                    method = "Pl@ntNet, with all ${plantPhotos.size} plant photo${if (plantPhotos.size == 1) "" else "s"} sent together " +
+                        "(" + plantPhotos.joinToString { it.category.label.lowercase() } + "). Pl@ntNet weighs each part itself and " +
+                        "returns one combined % per species."
+                    fromPlantNet
+                } else {
+                    onDeviceMethod("plant", plantPhotos.size)
+                    onDeviceCombined(plantPhotos, OnDeviceClassifier.Model.PLANTS, messages, perPhoto)
+                }
             }
 
             else -> {
@@ -69,7 +97,13 @@ class Identifier(
         val merged = mergeSubspecies(raw)
         val annotated = regions.annotate(merged, settings.regionPlaceId).take(5)
         if (raw.isNotEmpty() && annotated.isEmpty()) messages += "No confident matches"
-        return Result(enrich(annotated, settings), messages)
+        if (method != null && annotated.any { it.regionMatch == RegionMatch.NOT_RECORDED }) {
+            method += " Species not recorded in ${settings.regionName} are listed after ones that are, whatever their %."
+        }
+        if (method != null && raw.any { it.scientificName.trim().split(Regex("\\s+")).size > 2 }) {
+            method += " Subspecies are added into their species."
+        }
+        return Result(enrich(annotated, settings), messages, perPhoto, method)
     }
 
     /**
@@ -89,7 +123,9 @@ class Identifier(
             messages += if (raw.isEmpty()) "No birds heard clearly. Try again closer, or for longer."
             else "Only heard species that aren't recorded in ${settings.regionName}. Turn on \"Include other countries\" to see them."
         }
-        return Result(enrich(annotated, settings), messages)
+        val method = "BirdNET on the phone, listening in 3-second clips that overlap by half. Each bird's % is its " +
+            "best clip; \"heard in N clips\" counts the clips where it scored at least 10%."
+        return Result(enrich(annotated, settings), messages, method = method)
     }
 
     /**
@@ -100,9 +136,13 @@ class Identifier(
         photos: List<Photo>,
         model: OnDeviceClassifier.Model,
         messages: MutableList<String>,
+        perPhotoOut: MutableList<PhotoResult>,
     ): List<Candidate> {
         val perPhoto = photos.map { p ->
             mergeSubspecies(tryOrNote(messages) { onDevice.classify(p.path, model) })
+        }
+        if (perPhoto.size > 1) {
+            photos.forEachIndexed { i, p -> perPhotoOut += PhotoResult("Photo ${i + 1} (${p.category.label.lowercase()})", perPhoto[i].take(5)) }
         }
         if (perPhoto.size == 1) return perPhoto[0]
         return perPhoto.flatten()

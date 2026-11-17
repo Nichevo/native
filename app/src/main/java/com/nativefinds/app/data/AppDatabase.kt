@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class, Place::class, BirdCount::class, BirdCountEntry::class],
-    version = 6,
+    entities = [Find::class, FindPhoto::class, SpeciesInfo::class, SpeciesDetailsRow::class, RegionPack::class, RegionSpecies::class, Place::class, BirdCount::class, BirdCountEntry::class, IdRun::class],
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -18,14 +18,27 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun regions(): RegionDao
     abstract fun places(): PlaceDao
     abstract fun counts(): BirdCountDao
+    abstract fun idRuns(): IdRunDao
 
     companion object {
         const val NAME = "native-finds.db"
 
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `id_runs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `findId` INTEGER NOT NULL, " +
+                        "`at` INTEGER NOT NULL, `kind` TEXT NOT NULL, `label` TEXT NOT NULL, `method` TEXT, `candidatesJson` TEXT NOT NULL, " +
+                        "`perPhotoJson` TEXT, `chosen` TEXT, " +
+                        "FOREIGN KEY(`findId`) REFERENCES `finds`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_id_runs_findId` ON `id_runs` (`findId`)")
+            }
+        }
 
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {

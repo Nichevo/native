@@ -147,3 +147,12 @@ interface BirdCountDao {
     @Delete
     suspend fun delete(count: BirdCount)
 }
+
+@Dao
+interface IdRunDao {
+    @Query("SELECT * FROM id_runs WHERE findId = :findId ORDER BY at, id")
+    fun observe(findId: Long): Flow<List<IdRun>>
+
+    @Insert
+    suspend fun insert(runs: List<IdRun>)
+}

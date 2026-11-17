@@ -146,3 +146,29 @@ data class BirdCountEntry(
     val commonName: String?,
     val count: Int,
 )
+
+/**
+ * One identification of a find, kept so you can see how the matches and their % changed as photos
+ * were added, and why. [kind] is AUTO (photo ID), PC, SONG or CHOICE (you picked a species).
+ */
+@Entity(
+    tableName = "id_runs",
+    foreignKeys = [ForeignKey(entity = Find::class, parentColumns = ["id"], childColumns = ["findId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("findId")],
+)
+data class IdRun(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val findId: Long,
+    val at: Long,
+    val kind: String,
+    /** What prompted it, e.g. "Added photo 2: Bark". */
+    val label: String,
+    /** How the numbers were worked out, in plain words. */
+    val method: String?,
+    /** Candidates, best first: JSON array of {name, common, score, source, region, note}. */
+    val candidatesJson: String,
+    /** Each photo's own top matches before combining: JSON array of {photo, candidates}. */
+    val perPhotoJson: String?,
+    /** Species chosen (for CHOICE runs). */
+    val chosen: String?,
+)

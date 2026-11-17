@@ -69,6 +69,13 @@ class PcQueueWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 f.copy(pendingPc = false, notes = appendNote(f.notes, summary))
             }
             c.db.finds().update(updated)
+            c.db.idRuns().insert(listOf(IdHistory.run(
+                f.id, System.currentTimeMillis(), IdHistory.PC, "Your PC checked it later",
+                "Your PC's AI model (${s.pcAiModel}) looked at all ${photos.size} photo${if (photos.size == 1) "" else "s"} together. " +
+                    "Its % is the model's own estimate of how sure it is, not a calculated probability." +
+                    (opinion.notes?.let { " It said: $it" } ?: ""),
+                opinion.candidates,
+            )))
         }
         return Result.success()
     }
