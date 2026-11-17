@@ -220,6 +220,18 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
             }
             st.pcNotes?.let { Text("PC AI notes: $it", style = MaterialTheme.typography.bodyMedium) }
 
+            if (st.runs.isNotEmpty()) {
+                var showRuns by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+                androidx.compose.material3.TextButton(onClick = { showRuns = !showRuns }) {
+                    Text(if (showRuns) "Hide how the % changed" else "How the % changed with each photo (${st.runs.size} steps)")
+                }
+                if (showRuns) {
+                    com.nativefinds.app.ui.common.IdHistoryView(st.runs, st.selected?.scientificName, onUse = null)
+                    Text("This history is saved with the find, so you can look at it again later.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                }
+            }
+
             if (st.sounds.isNotEmpty() && !st.hasPhotos) {
                 Text(
                     "This find is a sound recording. You can change the species by hand, or add a photo to identify it from that.",

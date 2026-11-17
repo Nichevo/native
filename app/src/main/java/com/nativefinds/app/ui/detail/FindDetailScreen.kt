@@ -76,6 +76,7 @@ fun FindDetailScreen(
     var loadingInfo by remember { mutableStateOf(false) }
     var notes by remember(findId) { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val runs by remember(findId) { container.db.idRuns().observe(findId) }.collectAsState(initial = emptyList())
 
     val f = find
     val placeId = f?.regionPlaceId ?: settings?.regionPlaceId ?: Regions.NEW_ZEALAND.placeId
@@ -189,6 +190,41 @@ fun FindDetailScreen(
                 }
             } else {
                 Text("No location saved", color = MaterialTheme.colorScheme.outline)
+            }
+
+            Text("How this was identified", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            if (runs.isEmpty()) {
+                Text(
+                    if (f.scientificName == null) "No identification saved yet."
+                    else "Saved before the app kept ID history: ${f.commonName ?: f.scientificName}" +
+                        (f.confidence?.let { " at ${(it * 100).toInt()}%" } ?: "") + (f.idSource?.let { " from $it" } ?: "") +
+                        ". Tap Review to identify it again and start a history.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                com.nativefinds.app.ui.common.IdHistoryView(runs, f.scientificName) { cand ->
+                    scope.launch {
+                        val s = container.settings.current()
+                        val newInfo = runCatching { container.species.info(cand.scientificName, placeId, s.offlineMode) }.getOrNull()
+                        val name = newInfo?.commonName ?: cand.commonName ?: cand.scientificName
+                        container.db.finds().update(
+                            f.copy(
+                                scientificName = cand.scientificName,
+                                commonName = newInfo?.commonName ?: cand.commonName,
+                                confidence = cand.score,
+                                idSource = cand.source.label,
+                                taxonId = newInfo?.taxonId,
+                                establishment = newInfo?.establishment ?: cand.establishment,
+                            ),
+                        )
+                        container.db.idRuns().insert(listOf(com.nativefinds.app.id.IdHistory.run(
+                            findId, System.currentTimeMillis(), com.nativefinds.app.id.IdHistory.CHOICE,
+                            "You changed it to $name",
+                            "Was ${f.commonName ?: f.scientificName ?: "unidentified"}. Picked from the latest matches (${(cand.score * 100).toInt()}% from ${cand.source.label}).",
+                            emptyList(), chosen = cand.scientificName,
+                        )))
+                    }
+                }
             }
 
             OutlinedButton(onClick = { onEdit(findId) }, modifier = Modifier.fillMaxWidth()) {

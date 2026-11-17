@@ -21,6 +21,9 @@ they're native, and keeping a record of each find with its photo, GPS location a
 - **Offline mode**: on-phone models and cached data only, with no internet calls. Handy where Google
   and Wikipedia are blocked, or there's no signal.
 - **Finds**: list with search, a map (OpenStreetMap), notes, sharing, and CSV export.
+- **ID history**: every identification of a find is kept: the matches and their %, how each new photo moved
+  the %, each photo's own matches, and how the numbers were worked out. You can switch a find to another
+  match from there.
 - **My places**: save spots like "My garden" with a size (25 m to 1 km). Finds inside a place are grouped there
   automatically, so you can filter finds by place and see its species list. Places show on the map.
   Each place has a "through the year" page showing the months each species turns up.

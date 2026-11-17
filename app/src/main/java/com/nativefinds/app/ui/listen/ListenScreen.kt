@@ -77,6 +77,7 @@ data class ListenState(
     val startedAt: Long? = null,
     val saving: Boolean = false,
     val settings: AppSettings = AppSettings(),
+    val method: String? = null,
 )
 
 class ListenViewModel(private val c: AppContainer) : ViewModel() {
@@ -132,7 +133,7 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
             val st = _state.value
             val result = runCatching { c.identifier.identifySong(SoundRecorder.toFloats(pcm), st.settings, st.includeElsewhere) }
             result.onSuccess { r ->
-                _state.update { it.copy(analysing = false, candidates = r.candidates, messages = r.messages, selected = r.candidates.firstOrNull()) }
+                _state.update { it.copy(analysing = false, candidates = r.candidates, messages = r.messages, selected = r.candidates.firstOrNull(), method = r.method) }
             }.onFailure { e ->
                 _state.update { it.copy(analysing = false, messages = listOf("Couldn't analyse the recording: ${e.message}")) }
             }
@@ -170,6 +171,15 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
             )
             val id = c.db.finds().insert(find)
             c.db.finds().insertPhotos(listOf(FindPhoto(findId = id, path = file.path, category = SOUND, addedAt = System.currentTimeMillis())))
+            val runs = buildList {
+                add(com.nativefinds.app.id.IdHistory.run(id, System.currentTimeMillis(), com.nativefinds.app.id.IdHistory.SONG,
+                    "Recorded ${pcm.size / BirdSongClassifier.SAMPLE_RATE} s of song", st.method, st.candidates))
+                if (sel != null && sel != st.candidates.firstOrNull()) add(com.nativefinds.app.id.IdHistory.run(
+                    id, System.currentTimeMillis() + 1, com.nativefinds.app.id.IdHistory.CHOICE,
+                    "You chose " + (sel.commonName ?: sel.scientificName), "Picked from the matches (${(sel.score * 100).toInt()}%).",
+                    emptyList(), chosen = sel.scientificName))
+            }
+            c.db.idRuns().insert(runs)
             _state.value = ListenState(settings = st.settings, includeElsewhere = st.includeElsewhere)
             onSaved(id)
         }

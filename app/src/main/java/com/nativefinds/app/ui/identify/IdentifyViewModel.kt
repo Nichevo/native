@@ -54,6 +54,8 @@ data class IdentifyState(
     val notes: String = "",
     val saving: Boolean = false,
     val settings: AppSettings = AppSettings(),
+    /** Identifications made in this session, saved with the find so you can look back at them. */
+    val runs: List<com.nativefinds.app.data.IdRun> = emptyList(),
 ) {
     val hasPhotos get() = photos.isNotEmpty()
     /** Photos or a kept sound recording: enough to save. */
@@ -66,6 +68,8 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
     val state: StateFlow<IdentifyState> = _state
     private var pendingCapture: File? = null
     private var original: Find? = null
+    /** What prompted the next identification, for its history entry. */
+    private var nextLabel: String? = null
 
     init {
         viewModelScope.launch { c.settings.settings.collect { s -> _state.update { it.copy(settings = s) } } }
@@ -101,6 +105,7 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
         val st = _state.value
         if (st.photos.size == 1 && st.photos[0].category != cat) {
             _state.update { it.copy(photos = listOf(it.photos[0].copy(category = cat))) }
+            nextLabel = "Changed the photo to ${cat.label.lowercase()}"
             identify()
         }
     }
@@ -140,6 +145,8 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             c.photos.clearCaptures()
             val first = !_state.value.hasPhotos
             _state.update { it.copy(photos = it.photos + PhotoItem(file.absolutePath, it.category, isNew = true)) }
+            val n = _state.value.photos.size
+            nextLabel = if (n == 1) "First photo: ${_state.value.category.label.lowercase()}" else "Added photo $n: ${_state.value.category.label.lowercase()}"
             // The find's place is where the first photo was taken; editing keeps the original place.
             if (first && _state.value.findId == null) {
                 if (exifLocation != null) {
@@ -162,6 +169,7 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
                 removedPaths = if (item.isNew) it.removedPaths else it.removedPaths + path,
             )
         }
+        nextLabel = "Removed a photo (${_state.value.photos.size} left)"
         if (_state.value.hasPhotos) identify() else _state.update { it.copy(candidates = emptyList()) }
     }
 
@@ -195,7 +203,17 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             val s = c.settings.current()
             val r = c.identifier.identify(currentPhotos(), s)
             val keepSelection = _state.value.selected?.source == IdSource.MANUAL
-            _state.update { it.copy(identifying = false, candidates = r.candidates, messages = r.messages) }
+            val label = nextLabel ?: "Identified again with ${_state.value.photos.size} photo${if (_state.value.photos.size == 1) "" else "s"}"
+            nextLabel = null
+            val run = com.nativefinds.app.id.IdHistory.run(
+                0, System.currentTimeMillis(), com.nativefinds.app.id.IdHistory.AUTO, label, r.method, r.candidates, r.perPhoto,
+            )
+            _state.update {
+                it.copy(
+                    identifying = false, candidates = r.candidates, messages = r.messages,
+                    runs = if (r.candidates.isEmpty() && r.method == null) it.runs else it.runs + run,
+                )
+            }
             if (!keepSelection) r.candidates.firstOrNull()?.let { select(it) }
         }
     }
@@ -210,8 +228,17 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
                 result.fold(
                     onSuccess = { op ->
                         val others = st.candidates.filterNot { it.source == IdSource.PC_AI }
+                        val n = st.photos.size
+                        val pcRun = com.nativefinds.app.id.IdHistory.run(
+                            0, System.currentTimeMillis(), com.nativefinds.app.id.IdHistory.PC, "Asked my PC",
+                            "Your PC's AI model (${s.pcAiModel}) looked at all $n photo${if (n == 1) "" else "s"} together. " +
+                                "Its % is the model's own estimate of how sure it is, not a calculated probability." +
+                                (op.notes?.let { " It said: $it" } ?: ""),
+                            op.candidates,
+                        )
                         st.copy(
                             askingPc = false,
+                            runs = st.runs + pcRun,
                             candidates = op.candidates + others,
                             pcNotes = op.notes,
                             messages = if (op.candidates.isEmpty()) st.messages + "Your PC couldn't name a species" else st.messages,
@@ -290,6 +317,20 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
                     st.sounds.mapIndexed { i, p -> FindPhoto(findId = id, path = p, category = "SOUND", addedAt = now + st.photos.size + i) },
             )
             st.removedPaths.forEach { c.photos.delete(it) }
+            // Keep this session's identifications, and note the species you chose if it wasn't simply the top match.
+            val lastTop = st.runs.lastOrNull { it.kind != com.nativefinds.app.id.IdHistory.CHOICE }
+                ?.let { com.nativefinds.app.id.IdHistory.candidates(it).firstOrNull()?.scientificName }
+            val changed = sel != null && if (base == null) !sel.scientificName.equals(lastTop, ignoreCase = true)
+                else !sel.scientificName.equals(base.scientificName, ignoreCase = true)
+            val choice = if (changed && sel != null) listOf(
+                com.nativefinds.app.id.IdHistory.run(
+                    id, now, com.nativefinds.app.id.IdHistory.CHOICE,
+                    (if (base?.scientificName != null) "You changed it to " else "You chose ") + (info?.commonName ?: sel.commonName ?: sel.scientificName),
+                    if (sel.source == IdSource.MANUAL) "Entered by hand." else "Picked from the matches (${(sel.score * 100).toInt()}% from ${sel.source.label}).",
+                    emptyList(), chosen = sel.scientificName,
+                ),
+            ) else emptyList()
+            c.db.idRuns().insert(st.runs.map { it.copy(findId = id) } + choice)
             if (find.pendingPc) PcQueueWorker.runNow(c.appContext)
             _state.value = IdentifyState(settings = st.settings) // photos now belong to the find
             onSaved(id)
