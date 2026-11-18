@@ -107,6 +107,22 @@ class Identifier(
     }
 
     /**
+     * Guesses what a photo shows by running the on-phone bird, plant and insect models and taking the
+     * one most sure of its top match. Null when none is reasonably sure.
+     */
+    suspend fun guessCategory(path: String): Category? {
+        val tries = listOf(
+            Category.BIRD to OnDeviceClassifier.Model.BIRDS,
+            Category.LEAF to OnDeviceClassifier.Model.PLANTS,
+            Category.INSECT to OnDeviceClassifier.Model.INSECTS,
+        ).filter { onDevice.isAvailable(it.second) }
+        val best = tries.map { (cat, model) ->
+            cat to (runCatching { onDevice.classify(path, model, max = 1).firstOrNull()?.score }.getOrNull() ?: 0f)
+        }.maxByOrNull { it.second } ?: return null
+        return if (best.second >= 0.25f) best.first else null
+    }
+
+    /**
      * Identifies birds from a sound recording (48 kHz mono) with BirdNET, on the phone.
      * Species not recorded in the region are dropped unless [includeElsewhere].
      */

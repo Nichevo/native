@@ -56,6 +56,11 @@ data class IdentifyState(
     val settings: AppSettings = AppSettings(),
     /** Identifications made in this session, saved with the find so you can look back at them. */
     val runs: List<com.nativefinds.app.data.IdRun> = emptyList(),
+    /** What the app guessed the first photo shows, and whether it's still working that out. */
+    val guess: Category? = null,
+    val guessing: Boolean = false,
+    /** First photo taken but no type chosen or guessed yet. */
+    val needsType: Boolean = false,
 ) {
     val hasPhotos get() = photos.isNotEmpty()
     /** Photos or a kept sound recording: enough to save. */
@@ -100,7 +105,14 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
     }
 
     fun setCategory(cat: Category) {
-        _state.update { it.copy(category = cat) }
+        val wasWaiting = _state.value.needsType
+        _state.update { it.copy(category = cat, needsType = false) }
+        if (wasWaiting && _state.value.photos.size == 1) {
+            _state.update { it.copy(photos = listOf(it.photos[0].copy(category = cat))) }
+            nextLabel = "First photo: ${cat.label.lowercase()}"
+            identify()
+            return
+        }
         // With a single photo, changing the category re-labels that photo and re-runs identification.
         val st = _state.value
         if (st.photos.size == 1 && st.photos[0].category != cat) {
@@ -146,7 +158,6 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             val first = !_state.value.hasPhotos
             _state.update { it.copy(photos = it.photos + PhotoItem(file.absolutePath, it.category, isNew = true)) }
             val n = _state.value.photos.size
-            nextLabel = if (n == 1) "First photo: ${_state.value.category.label.lowercase()}" else "Added photo $n: ${_state.value.category.label.lowercase()}"
             // The find's place is where the first photo was taken; editing keeps the original place.
             if (first && _state.value.findId == null) {
                 if (exifLocation != null) {
@@ -155,6 +166,19 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
                     locate()
                 }
             }
+            // A new find's first photo: work out what it shows, then identify.
+            if (n == 1 && _state.value.findId == null) {
+                _state.update { it.copy(guessing = true) }
+                val g = runCatching { c.identifier.guessCategory(file.absolutePath) }.getOrNull()
+                if (g == null) {
+                    _state.update { it.copy(guessing = false, guess = null, needsType = true) }
+                    return@launch
+                }
+                _state.update {
+                    it.copy(guessing = false, guess = g, category = g, photos = listOf(it.photos[0].copy(category = g)))
+                }
+            }
+            nextLabel = if (n == 1) "First photo: ${_state.value.category.label.lowercase()}" else "Added photo $n: ${_state.value.category.label.lowercase()}"
             identify()
         }
     }
@@ -170,7 +194,7 @@ class IdentifyViewModel(private val c: AppContainer, private val editFindId: Lon
             )
         }
         nextLabel = "Removed a photo (${_state.value.photos.size} left)"
-        if (_state.value.hasPhotos) identify() else _state.update { it.copy(candidates = emptyList()) }
+        if (_state.value.hasPhotos) identify() else _state.update { it.copy(candidates = emptyList(), guess = null, needsType = false) }
     }
 
     fun locate() {

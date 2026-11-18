@@ -108,10 +108,12 @@ fun AppNav(container: AppContainer, openRoute: String? = null, onOpened: () -> U
             composable("finds") {
                 FindsScreen(
                     container = container,
-                    onNewFind = { nav.navigate("identify") },
+                    onCamera = { nav.navigate("identify?start=camera") },
+                    onGallery = { nav.navigate("identify?start=gallery") },
                     onOpen = { id -> nav.navigate("find/$id") },
                     onStats = { nav.navigate("stats") },
-                    onListen = { nav.navigate("listen") },
+                    onListen = { nav.navigate("listen?auto=true") },
+                    onChorus = { nav.navigate("chorus") },
                     onOpenPlace = { id -> nav.navigate("place/$id") },
                     onCount = { nav.navigate("count/0") },
                     onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
@@ -131,9 +133,13 @@ fun AppNav(container: AppContainer, openRoute: String? = null, onOpened: () -> U
                     onOpenSpecies = { name -> nav.navigate("species/" + Uri.encode(name)) },
                 )
             }
-            composable("listen") {
+            composable(
+                "listen?auto={auto}",
+                arguments = listOf(navArgument("auto") { type = NavType.BoolType; defaultValue = false }),
+            ) { entry ->
                 ListenScreen(
                     container = container,
+                    autoStart = entry.arguments?.getBoolean("auto") ?: false,
                     onBack = { nav.popBackStack() },
                     onSaved = { id -> nav.navigate("find/$id") { popUpTo("finds") } },
                     onChorus = { nav.navigate("chorus") },
@@ -185,9 +191,13 @@ fun AppNav(container: AppContainer, openRoute: String? = null, onOpened: () -> U
             composable("settings") {
                 SettingsScreen(container = container, onOpenPlace = { id -> nav.navigate("place/$id") })
             }
-            composable("identify") {
+            composable(
+                "identify?start={start}",
+                arguments = listOf(navArgument("start") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
                 IdentifyScreen(
                     container = container,
+                    start = entry.arguments?.getString("start"),
                     onBack = { nav.popBackStack() },
                     onSaved = { id ->
                         nav.navigate("find/$id") { popUpTo("finds") }

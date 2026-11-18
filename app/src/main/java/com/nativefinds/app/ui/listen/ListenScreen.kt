@@ -34,6 +34,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -195,7 +196,7 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit, onChorus: () -> Unit = {}) {
+fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit, onChorus: () -> Unit = {}, autoStart: Boolean = false) {
     val vm: ListenViewModel = viewModel { ListenViewModel(container) }
     val st by vm.state.collectAsState()
     val ctx = LocalContext.current
@@ -204,6 +205,17 @@ fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) ->
     }
     DisposableEffect(Unit) { onDispose { vm.stop() } }
     val available = remember { container.birdSong.isAvailable() }
+    // Opened from the main page's Listen button: start recording straight away.
+    var autoStarted by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (autoStart && !autoStarted && available) {
+            autoStarted = true
+            val hasMic = ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (hasMic) vm.start() else askPermissions.launch(
+                arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
