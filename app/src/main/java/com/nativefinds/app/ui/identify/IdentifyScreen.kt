@@ -66,15 +66,32 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: () -> Unit, onSaved: (Long) -> Unit) {
+fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, start: String? = null, onBack: () -> Unit, onSaved: (Long) -> Unit) {
     val vm: IdentifyViewModel = viewModel(key = "identify-${editFindId ?: "new"}") { IdentifyViewModel(container, editFindId) }
     val st by vm.state.collectAsStateWithLifecycle()
 
     val leave = { vm.discard(); onBack() }
     BackHandler(onBack = leave)
 
-    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> vm.onCaptured(ok) }
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> vm.onPicked(uri) }
+    // Opened straight from the main page's Camera or Gallery button: if you back out without a photo, go back.
+    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        vm.onCaptured(ok)
+        if (!ok && start != null && !vm.state.value.hasPhotos) leave()
+    }
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        vm.onPicked(uri)
+        if (uri == null && start != null && !vm.state.value.hasPhotos) leave()
+    }
+    var launched by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!launched && editFindId == null && !vm.state.value.hasPhotos) {
+            launched = true
+            when (start) {
+                "camera" -> takePicture.launch(vm.newCaptureUri())
+                "gallery" -> pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+        }
+    }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it } && editFindId == null) vm.locate()
     }
@@ -97,13 +114,17 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                if (st.hasPhotos) "Next photo shows:" else "What are you photographing?",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Category.entries.forEach { cat ->
-                    FilterChip(selected = st.category == cat, onClick = { vm.setCategory(cat) }, label = { Text(cat.label) })
+            if (!st.hasPhotos) {
+                Text(
+                    "Take a photo or choose one from your gallery. You'll say what it shows afterwards.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else if (st.photos.size > 1) {
+                Text("Next photo shows:", style = MaterialTheme.typography.titleSmall)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Category.entries.forEach { cat ->
+                        FilterChip(selected = st.category == cat, onClick = { vm.setCategory(cat) }, label = { Text(cat.label) })
+                    }
                 }
             }
             if (st.settings.offlineMode) {
@@ -157,6 +178,24 @@ fun IdentifyScreen(container: AppContainer, editFindId: Long? = null, onBack: ()
                 }
             }
 
+            if (st.photos.size == 1) {
+                Text("What did you photograph?", style = MaterialTheme.typography.titleMedium)
+                when {
+                    st.guessing -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CircularProgressIndicator(Modifier.size(18.dp)); Text("Working out what this is…", style = MaterialTheme.typography.bodySmall)
+                    }
+                    st.needsType -> Text("Tap what it shows to start identifying.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary)
+                    st.guess != null && st.guess == st.photos[0].category -> Card(Modifier.fillMaxWidth()) {
+                        Text(
+                            "✨ Looks like ${if (st.guess == Category.LEAF) "a plant (leaf)" else "a " + st.guess?.label?.lowercase()}, so I've started with that. Tap another if it's wrong.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
+                TypeGrid(selected = if (st.needsType || st.guessing) null else st.photos[0].category) { vm.setCategory(it) }
+            }
             if (st.hasPhotos) {
                 LocationLine(st, onRetry = { vm.locate() })
             }
@@ -326,6 +365,43 @@ private fun ManualEntry(onEnter: (String) -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { onEnter(text); open = false }) { Text("Use") }
+        }
+    }
+}
+
+private val TYPE_EMOJI = mapOf(
+    Category.BIRD to "🐦", Category.LEAF to "🍃", Category.FLOWER to "🌸", Category.FRUIT to "🍒", Category.BARK to "🪵",
+    Category.WHOLE_PLANT to "🌳", Category.INSECT to "🐞", Category.LIZARD to "🦎", Category.OTHER to "❓",
+)
+
+/** Big tappable tiles for what the photo shows. */
+@Composable
+private fun TypeGrid(selected: Category?, onPick: (Category) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Category.entries.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { cat ->
+                    val on = cat == selected
+                    Card(
+                        onClick = { onPick(cat) },
+                        modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        border = if (on) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(TYPE_EMOJI[cat] ?: "", style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                cat.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.Bold else null,
+                            )
+                        }
+                    }
+                }
+                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
+            }
         }
     }
 }
