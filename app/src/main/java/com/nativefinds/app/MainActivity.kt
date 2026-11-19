@@ -141,7 +141,10 @@ fun AppNav(container: AppContainer, openRoute: String? = null, onOpened: () -> U
                     container = container,
                     autoStart = entry.arguments?.getBoolean("auto") ?: false,
                     onBack = { nav.popBackStack() },
-                    onSaved = { id -> nav.navigate("find/$id") { popUpTo("finds") } },
+                    onSaved = { ids ->
+                        if (ids.size == 1) nav.navigate("find/${ids[0]}") { popUpTo("finds") }
+                        else nav.popBackStack("finds", inclusive = false)
+                    },
                     onChorus = { nav.navigate("chorus") },
                 )
             }

@@ -70,7 +70,8 @@ data class ListenState(
     val candidates: List<Candidate> = emptyList(),
     val messages: List<String> = emptyList(),
     val includeElsewhere: Boolean = false,
-    val selected: Candidate? = null,
+    /** Birds you agree were in the recording (lower-case scientific names). Each becomes its own find. */
+    val chosen: Set<String> = emptySet(),
     val notes: String = "",
     val latitude: Double? = null,
     val longitude: Double? = null,
@@ -134,55 +135,76 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
             val st = _state.value
             val result = runCatching { c.identifier.identifySong(SoundRecorder.toFloats(pcm), st.settings, st.includeElsewhere) }
             result.onSuccess { r ->
-                _state.update { it.copy(analysing = false, candidates = r.candidates, messages = r.messages, selected = r.candidates.firstOrNull(), method = r.method) }
+                _state.update { it.copy(
+                    analysing = false, candidates = r.candidates, messages = r.messages, method = r.method,
+                    // Tick the clear ones (50%+), or the top one if none is that clear.
+                    chosen = (r.candidates.filter { c -> c.score >= 0.5f }.ifEmpty { r.candidates.take(1) })
+                        .map { c -> c.scientificName.lowercase() }.toSet(),
+                ) }
             }.onFailure { e ->
                 _state.update { it.copy(analysing = false, messages = listOf("Couldn't analyse the recording: ${e.message}")) }
             }
         }
     }
 
-    fun select(cand: Candidate) = _state.update { it.copy(selected = cand) }
+    fun toggle(cand: Candidate) = _state.update {
+        val k = cand.scientificName.lowercase()
+        it.copy(chosen = if (k in it.chosen) it.chosen - k else it.chosen + k)
+    }
     fun setNotes(n: String) = _state.update { it.copy(notes = n) }
 
-    /** Saves the recording as its own find (its own date and place), keeping the sound file. */
-    fun save(onSaved: (Long) -> Unit) {
+    /**
+     * Saves each ticked bird as its own find, each with its own copy of the recording and the full list
+     * of birds heard in its ID history. With none ticked, saves the recording as one unidentified find.
+     */
+    fun save(onSaved: (List<Long>) -> Unit) {
         val st = _state.value
         val pcm = st.pcm ?: return
         viewModelScope.launch {
             _state.update { it.copy(saving = true) }
-            val file = c.photos.newSoundFile()
-            SoundRecorder.writeWav(pcm, BirdSongClassifier.SAMPLE_RATE, file)
-            val sel = st.selected
-            val info = sel?.let { runCatching { c.species.info(it.scientificName, st.settings.regionPlaceId, st.settings.offlineMode) }.getOrNull() }
-            val find = Find(
-                photoPath = file.path,
-                createdAt = st.startedAt ?: System.currentTimeMillis(),
-                latitude = st.latitude,
-                longitude = st.longitude,
-                accuracyMeters = st.accuracy,
-                category = Category.BIRD.name,
-                scientificName = sel?.scientificName,
-                commonName = info?.commonName ?: sel?.commonName,
-                confidence = sel?.score,
-                idSource = sel?.source?.label,
-                taxonId = info?.taxonId,
-                establishment = info?.establishment ?: sel?.establishment,
-                regionPlaceId = st.settings.regionPlaceId,
-                notes = st.notes,
-            )
-            val id = c.db.finds().insert(find)
-            c.db.finds().insertPhotos(listOf(FindPhoto(findId = id, path = file.path, category = SOUND, addedAt = System.currentTimeMillis())))
-            val runs = buildList {
-                add(com.nativefinds.app.id.IdHistory.run(id, System.currentTimeMillis(), com.nativefinds.app.id.IdHistory.SONG,
-                    "Recorded ${pcm.size / BirdSongClassifier.SAMPLE_RATE} s of song", st.method, st.candidates))
-                if (sel != null && sel != st.candidates.firstOrNull()) add(com.nativefinds.app.id.IdHistory.run(
-                    id, System.currentTimeMillis() + 1, com.nativefinds.app.id.IdHistory.CHOICE,
-                    "You chose " + (sel.commonName ?: sel.scientificName), "Picked from the matches (${(sel.score * 100).toInt()}%).",
-                    emptyList(), chosen = sel.scientificName))
+            val chosen = st.candidates.filter { it.scientificName.lowercase() in st.chosen }
+            val targets: List<Candidate?> = chosen.ifEmpty { listOf(null) }
+            val secs = pcm.size / BirdSongClassifier.SAMPLE_RATE
+            val others = chosen.map { it.commonName ?: it.scientificName }
+            val ids = mutableListOf<Long>()
+            for ((n, sel) in targets.withIndex()) {
+                val file = c.photos.newSoundFile()
+                SoundRecorder.writeWav(pcm, BirdSongClassifier.SAMPLE_RATE, file)
+                val info = sel?.let { runCatching { c.species.info(it.scientificName, st.settings.regionPlaceId, st.settings.offlineMode) }.getOrNull() }
+                val shared = if (chosen.size > 1) "One of ${chosen.size} birds in the same recording: ${others.joinToString()}." else null
+                val find = Find(
+                    photoPath = file.path,
+                    createdAt = (st.startedAt ?: System.currentTimeMillis()) + n, // keeps them in order
+                    latitude = st.latitude,
+                    longitude = st.longitude,
+                    accuracyMeters = st.accuracy,
+                    category = Category.BIRD.name,
+                    scientificName = sel?.scientificName,
+                    commonName = info?.commonName ?: sel?.commonName,
+                    confidence = sel?.score,
+                    idSource = sel?.source?.label,
+                    taxonId = info?.taxonId,
+                    establishment = info?.establishment ?: sel?.establishment,
+                    regionPlaceId = st.settings.regionPlaceId,
+                    notes = listOfNotNull(st.notes.takeIf { it.isNotBlank() }, shared, sel?.note).joinToString("\n\n"),
+                )
+                val id = c.db.finds().insert(find)
+                c.db.finds().insertPhotos(listOf(FindPhoto(findId = id, path = file.path, category = SOUND, addedAt = System.currentTimeMillis())))
+                val now = System.currentTimeMillis()
+                c.db.idRuns().insert(buildList {
+                    add(com.nativefinds.app.id.IdHistory.run(id, now, com.nativefinds.app.id.IdHistory.SONG,
+                        "Recorded $secs s of song", st.method, st.candidates))
+                    if (sel != null && (chosen.size > 1 || sel != st.candidates.firstOrNull())) add(com.nativefinds.app.id.IdHistory.run(
+                        id, now + 1, com.nativefinds.app.id.IdHistory.CHOICE,
+                        "You ticked " + (sel.commonName ?: sel.scientificName),
+                        (if (chosen.size > 1) "You ticked ${chosen.size} birds in this recording; each is its own find. " else "") +
+                            "${(sel.score * 100).toInt()}% from ${sel.source.label}.",
+                        emptyList(), chosen = sel.scientificName))
+                })
+                ids += id
             }
-            c.db.idRuns().insert(runs)
             _state.value = ListenState(settings = st.settings, includeElsewhere = st.includeElsewhere)
-            onSaved(id)
+            onSaved(ids)
         }
     }
 
@@ -196,7 +218,7 @@ class ListenViewModel(private val c: AppContainer) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) -> Unit, onChorus: () -> Unit = {}, autoStart: Boolean = false) {
+fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (List<Long>) -> Unit, onChorus: () -> Unit = {}, autoStart: Boolean = false) {
     val vm: ListenViewModel = viewModel { ListenViewModel(container) }
     val st by vm.state.collectAsState()
     val ctx = LocalContext.current
@@ -269,17 +291,28 @@ fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) ->
             )
             st.messages.forEach { Text(it, color = MaterialTheme.colorScheme.error) }
             if (st.candidates.isNotEmpty()) {
-                Text("Birds heard. Tap one to choose it.", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (st.candidates.size == 1) "Bird heard. Tap to untick it if you don't agree."
+                    else "${st.candidates.size} birds heard. Tick each one you agree with; each is saved as its own find.",
+                    style = MaterialTheme.typography.titleSmall,
+                )
                 st.candidates.forEach { cand ->
-                    CandidateRow(
-                        cand,
-                        st.settings.regionName,
-                        onClick = { vm.select(cand) },
-                        selected = st.selected?.scientificName == cand.scientificName,
-                        pest = container.pests.lookup(cand.scientificName, st.settings.regionPlaceId),
-                    )
+                    val on = cand.scientificName.lowercase() in st.chosen
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = on, onCheckedChange = { vm.toggle(cand) })
+                        CandidateRow(
+                            cand,
+                            st.settings.regionName,
+                            onClick = { vm.toggle(cand) },
+                            selected = on,
+                            pest = container.pests.lookup(cand.scientificName, st.settings.regionPlaceId),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
-                st.selected?.let { sel -> container.pests.lookup(sel.scientificName, st.settings.regionPlaceId)?.let { PestBanner(it) } }
+                st.candidates.filter { it.scientificName.lowercase() in st.chosen }.forEach { sel ->
+                    container.pests.lookup(sel.scientificName, st.settings.regionPlaceId)?.let { PestBanner(it) }
+                }
             }
             if (st.pcm != null && !st.recording) {
                 OutlinedTextField(
@@ -291,7 +324,13 @@ fun ListenScreen(container: AppContainer, onBack: () -> Unit, onSaved: (Long) ->
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(enabled = !st.saving && !st.analysing, onClick = { vm.save(onSaved) }) {
-                        Text(if (st.selected == null) "Save recording" else "Save find")
+                        Text(
+                            when (st.chosen.size) {
+                                0 -> "Save recording"
+                                1 -> "Save find"
+                                else -> "Save ${st.chosen.size} finds"
+                            },
+                        )
                     }
                     OutlinedButton(onClick = { vm.stop(); onBack() }) { Text("Discard") }
                 }
