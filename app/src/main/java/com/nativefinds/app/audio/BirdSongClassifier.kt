@@ -18,7 +18,14 @@ import kotlin.math.exp
  * (about 6,500 species worldwide). Works offline.
  */
 class BirdSongClassifier(private val context: Context) {
-    data class SongMatch(val scientificName: String, val commonName: String?, val score: Float, val windows: Int)
+    data class SongMatch(
+        val scientificName: String,
+        val commonName: String?,
+        val score: Float,
+        val windows: Int,
+        /** Start times (seconds) of the 3 s clips where it scored at least the minimum. */
+        val heardAt: List<Float> = emptyList(),
+    )
 
     private val lock = Mutex()
     private var interpreter: Interpreter? = null
@@ -54,6 +61,7 @@ class BirdSongClassifier(private val context: Context) {
             val step = windowLen / 2
             val best = FloatArray(outCount)
             val hits = IntArray(outCount)
+            val times = HashMap<Int, MutableList<Float>>()
             var start = 0
             do {
                 val window = FloatArray(windowLen)
@@ -64,7 +72,10 @@ class BirdSongClassifier(private val context: Context) {
                 for (i in 0 until outCount) {
                     val p = sigmoid(out[0][i])
                     if (p > best[i]) best[i] = p
-                    if (p >= minScore) hits[i]++
+                    if (p >= minScore) {
+                        hits[i]++
+                        times.getOrPut(i) { mutableListOf() } += start.toFloat() / SAMPLE_RATE
+                    }
                 }
                 start += step
             } while (start + step < samples.size)
@@ -72,7 +83,7 @@ class BirdSongClassifier(private val context: Context) {
             best.indices.filter { best[it] >= minScore && it < labels.size }
                 .sortedByDescending { best[it] }
                 .take(max)
-                .map { SongMatch(labels[it].first, labels[it].second, best[it], hits[it]) }
+                .map { SongMatch(labels[it].first, labels[it].second, best[it], hits[it], times[it].orEmpty()) }
         } }
 
     fun toCandidates(matches: List<SongMatch>): List<Candidate> = matches.map {
@@ -81,8 +92,21 @@ class BirdSongClassifier(private val context: Context) {
             commonName = it.commonName,
             score = it.score,
             source = IdSource.SONG,
-            note = "Heard in ${it.windows} of the recording's 3-second clips",
+            note = heardNote(it),
         )
+    }
+
+    /** "Heard at 0:03–0:09 and 0:21–0:24 (5 clips)". Overlapping clips are joined into one stretch. */
+    private fun heardNote(m: SongMatch): String {
+        if (m.heardAt.isEmpty()) return "Heard in ${m.windows} of the recording's 3-second clips"
+        val spans = mutableListOf<Pair<Float, Float>>()
+        m.heardAt.sorted().forEach { t ->
+            val last = spans.lastOrNull()
+            if (last != null && t <= last.second) spans[spans.size - 1] = last.first to (t + 3f) else spans += t to (t + 3f)
+        }
+        fun fmt(x: Float) = "%d:%02d".format(x.toInt() / 60, x.toInt() % 60)
+        val text = spans.take(4).joinToString(", ") { "${fmt(it.first)}–${fmt(it.second)}" } + if (spans.size > 4) "…" else ""
+        return "Heard at $text (${m.windows} clip${if (m.windows == 1) "" else "s"})"
     }
 
     private fun sigmoid(x: Float): Float = (1.0 / (1.0 + exp(-x.toDouble()))).toFloat()
