@@ -602,16 +602,39 @@ private fun FindRow(f: Find, photoCount: Int, sound: Boolean, placeName: String?
                     if (photoCount > 1) add("$photoCount photos")
                     if (sound && !isAudioPath(f.photoPath)) add("sound")
                     placeName?.let { add(it) }
-                    if (f.scientificName != null) f.confidence?.let { if (f.idSource != "Entered by hand") add("${(it * 100).toInt()}%") }
                 }
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 if (needsReview(f)) {
                     Text("Needs review", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-            establishmentLabel(f.establishment)?.let { (t, c) ->
-                Text(t, color = c, style = MaterialTheme.typography.labelMedium)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MatchBadge(f)
+                establishmentLabel(f.establishment)?.let { (t, c) ->
+                    Text(t, color = c, style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
+    }
+}
+
+/** The find's match %, coloured so low ones stand out: green 80%+, orange 50–79%, red under 50%. */
+@Composable
+private fun MatchBadge(f: Find) {
+    val (text, bg) = when {
+        f.scientificName == null -> "?" to Color(0xFFB3261E)
+        f.idSource == "Entered by hand" || f.confidence == null -> "You" to Color(0xFF52634F)
+        else -> {
+            val p = (f.confidence * 100).toInt()
+            "$p%" to when {
+                p >= 80 -> Color(0xFF2E7D32)
+                p >= 50 -> Color(0xFFE08A00)
+                else -> Color(0xFFB3261E)
+            }
+        }
+    }
+    Surface(color = bg, contentColor = Color.White, shape = RoundedCornerShape(12.dp)) {
+        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
     }
 }
